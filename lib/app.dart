@@ -2,10 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/theme/app_theme.dart';
+import 'core/theme/app_colors.dart';
 import 'features/onboarding/onboarding_provider.dart';
 import 'features/onboarding/onboarding_screen.dart';
 import 'features/dashboard/dashboard_screen.dart';
+import 'features/history/history_screen.dart';
+import 'features/weight/weight_screen.dart';
+import 'features/profile/profile_screen.dart';
 import 'features/food_log/food_search_screen.dart';
+import 'features/exercise_log/exercise_search_screen.dart';
 
 class CalorieTrackerApp extends StatelessWidget {
   const CalorieTrackerApp({super.key});
@@ -18,15 +23,17 @@ class CalorieTrackerApp extends StatelessWidget {
       darkTheme: AppTheme.dark,
       themeMode: ThemeMode.system,
       debugShowCheckedModeBanner: false,
-      routes: {
-        '/dashboard': (_) => const DashboardScreen(),
-        '/onboarding': (_) => const OnboardingScreen(),
-      },
       onGenerateRoute: (settings) {
         if (settings.name == '/food-search') {
           final mealType = (settings.arguments as String?) ?? 'breakfast';
           return MaterialPageRoute(
             builder: (_) => FoodSearchScreen(mealType: mealType),
+            settings: settings,
+          );
+        }
+        if (settings.name == '/exercise-search') {
+          return MaterialPageRoute(
+            builder: (_) => const ExerciseSearchScreen(),
             settings: settings,
           );
         }
@@ -54,10 +61,68 @@ class _AppRouter extends ConsumerWidget {
       ),
       data: (isComplete) {
         if (isComplete) {
-          return const DashboardScreen();
+          return const _MainShell();
         }
         return const OnboardingScreen();
       },
+    );
+  }
+}
+
+/// Main shell with bottom navigation: Dashboard · History · Weight · Profile
+class _MainShell extends StatefulWidget {
+  const _MainShell();
+
+  @override
+  State<_MainShell> createState() => _MainShellState();
+}
+
+class _MainShellState extends State<_MainShell> {
+  int _index = 0;
+
+  static const _screens = [
+    DashboardScreen(),
+    HistoryScreen(),
+    WeightScreen(),
+    ProfileScreen(),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: IndexedStack(
+        index: _index,
+        children: _screens,
+      ),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _index,
+        onTap: (i) => setState(() => _index = i),
+        type: BottomNavigationBarType.fixed,
+        selectedItemColor: AppColors.primary,
+        unselectedItemColor: Colors.grey,
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.dashboard_outlined),
+            activeIcon: Icon(Icons.dashboard),
+            label: 'Dashboard',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.history_outlined),
+            activeIcon: Icon(Icons.history),
+            label: 'History',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.monitor_weight_outlined),
+            activeIcon: Icon(Icons.monitor_weight),
+            label: 'Weight',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person_outline),
+            activeIcon: Icon(Icons.person),
+            label: 'Profile',
+          ),
+        ],
+      ),
     );
   }
 }
