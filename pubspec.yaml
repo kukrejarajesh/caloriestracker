@@ -1,0 +1,47 @@
+name: calorie_tracker
+description: "A standalone Android Calorie Tracker app inspired by HealthifyMe."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.11.3
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+
+  # Database
+  drift: ^2.14.0
+  drift_flutter: ^0.1.0
+
+  # State management
+  riverpod: ^2.5.0
+  flutter_riverpod: ^2.5.0
+  riverpod_annotation: ^2.3.0
+
+  # Charts
+  fl_chart: ^0.67.0
+
+  # Utilities
+  path_provider: ^2.1.0
+  google_fonts: ^6.1.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+  # Code generation
+  drift_dev: ^2.14.0
+  riverpod_generator: ^2.4.0
+  build_runner: ^2.4.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/foods.db
+    - assets/exercises.db
