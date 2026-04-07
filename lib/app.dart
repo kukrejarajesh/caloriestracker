@@ -5,6 +5,7 @@ import 'core/theme/app_theme.dart';
 import 'features/onboarding/onboarding_provider.dart';
 import 'features/onboarding/onboarding_screen.dart';
 import 'features/dashboard/dashboard_screen.dart';
+import 'features/food_log/food_search_screen.dart';
 
 class CalorieTrackerApp extends StatelessWidget {
   const CalorieTrackerApp({super.key});
@@ -20,6 +21,16 @@ class CalorieTrackerApp extends StatelessWidget {
       routes: {
         '/dashboard': (_) => const DashboardScreen(),
         '/onboarding': (_) => const OnboardingScreen(),
+      },
+      onGenerateRoute: (settings) {
+        if (settings.name == '/food-search') {
+          final mealType = (settings.arguments as String?) ?? 'breakfast';
+          return MaterialPageRoute(
+            builder: (_) => FoodSearchScreen(mealType: mealType),
+            settings: settings,
+          );
+        }
+        return null;
       },
       home: const _AppRouter(),
     );

@@ -36,8 +36,21 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   }
 
   void _next() {
-    if (_currentPage == 0 && !(_page1Key.currentState?.validate() ?? false)) {
-      return;
+    if (_currentPage == 0) {
+      if (!(_page1Key.currentState?.validate() ?? false)) return;
+      final state = ref.read(onboardingNotifierProvider);
+      if (state.dateOfBirth == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please select your date of birth.')),
+        );
+        return;
+      }
+      if (state.gender == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please select your gender.')),
+        );
+        return;
+      }
     }
     if (_currentPage == 1 && !(_page2Key.currentState?.validate() ?? false)) {
       return;
