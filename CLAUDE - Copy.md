@@ -134,18 +134,6 @@ tools/
 ## Build Order
 Follow steps sequentially — one Claude Code session per step.
 
-## Project Agents
-Specialist agents are defined in `.claude/agents/`. Delegate to them when the task falls within their domain.
-
-| Agent | When to Use |
-|---|---|
-| `frontend-agent` | Building or modifying screens, widgets, navigation, theming, Riverpod providers in the UI layer |
-| `database-agent` | Schema changes, DAO queries, Drift migrations, asset DB seeding, TDEE/MET utility logic |
-| `qa-agent` | Writing or updating unit tests, widget tests, integration tests — especially gluten safety test cases |
-| `gluten-compliance-agent` | Auditing any screen, DAO, widget, or provider for correct gluten handling — read-only reviewer |
-
-**Gluten compliance agent should be run after any change that touches food display, search, logging flow, or the foods DAO.**
-
 ## Do NOT
 - Make any HTTP calls anywhere in the app
 - Modify *.g.dart generated files
@@ -154,7 +142,3 @@ Specialist agents are defined in `.claude/agents/`. Delegate to them when the ta
 - Run seed scripts as part of app startup
 - Allow food logging without displaying gluten status
 - Default gluten filter to OFF — it must always default to ON
-- Bypass gluten-compliance-agent review when modifying food search, food detail, dashboard meal items, or foods_dao
-- Set gluten_status to null on any food row — use 'unknown' as the minimum
-- Render a food detail screen without the GlutenBadge widget
-- Treat 'unknown' gluten status as safe — always show amber warning

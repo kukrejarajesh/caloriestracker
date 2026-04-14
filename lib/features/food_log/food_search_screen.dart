@@ -6,6 +6,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/utils/gluten_utils.dart';
 import '../../data/database/app_database.dart';
 import '../../widgets/gluten_badge.dart';
+import 'custom_food_screen.dart';
 import 'food_log_provider.dart';
 
 class FoodSearchScreen extends ConsumerStatefulWidget {
@@ -56,6 +57,33 @@ class _FoodSearchScreenState extends ConsumerState<FoodSearchScreen> {
       appBar: AppBar(
         title: Text(
             'Add to ${mealType[0].toUpperCase()}${mealType.substring(1)}'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.upload_file),
+            tooltip: 'Import CSV',
+            onPressed: () async {
+              await Navigator.of(context).push<bool>(
+                MaterialPageRoute(
+                  builder: (_) => const CustomFoodScreen(),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+      floatingActionButton: FloatingActionButton(
+        backgroundColor: AppColors.primary,
+        onPressed: () async {
+          final added = await Navigator.of(context).push<bool>(
+            MaterialPageRoute(
+              builder: (_) => const CustomFoodScreen(),
+            ),
+          );
+          if (added == true) {
+            ref.invalidate(foodSearchProvider);
+          }
+        },
+        child: const Icon(Icons.add),
       ),
       body: Column(
         children: [
@@ -277,6 +305,22 @@ class _EmptyState extends StatelessWidget {
                 textAlign: TextAlign.center,
               ),
             ],
+            const SizedBox(height: 20),
+            OutlinedButton.icon(
+              onPressed: () {
+                Navigator.of(context).push<bool>(
+                  MaterialPageRoute(
+                    builder: (_) => const CustomFoodScreen(),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.add),
+              label: const Text('Add Custom Food'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.primary,
+                side: const BorderSide(color: AppColors.primary),
+              ),
+            ),
           ],
         ),
       ),
@@ -381,7 +425,26 @@ class _FoodDetailInlineState extends ConsumerState<_FoodDetailInline> {
     final isRisky = GlutenUtils.isRisky(status);
 
     return Scaffold(
-      appBar: AppBar(title: Text(food.name)),
+      appBar: AppBar(
+        title: Text(food.name),
+        actions: [
+          if (food.isCustom == 1)
+            IconButton(
+              icon: const Icon(Icons.edit),
+              tooltip: 'Edit Custom Food',
+              onPressed: () async {
+                final edited = await Navigator.of(context).push<bool>(
+                  MaterialPageRoute(
+                    builder: (_) => CustomFoodScreen(existingFood: food),
+                  ),
+                );
+                if (edited == true && mounted) {
+                  Navigator.of(context).pop();
+                }
+              },
+            ),
+        ],
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(

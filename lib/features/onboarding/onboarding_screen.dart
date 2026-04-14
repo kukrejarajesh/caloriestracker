@@ -88,8 +88,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     final ok =
         await ref.read(onboardingNotifierProvider.notifier).saveProfile();
     if (ok && mounted) {
-      // Navigate to dashboard — replace entire stack
-      Navigator.of(context).pushReplacementNamed('/dashboard');
+      // Invalidate the provider so _AppRouter re-evaluates and routes to _MainShell
+      ref.invalidate(onboardingCompleteProvider);
     }
   }
 

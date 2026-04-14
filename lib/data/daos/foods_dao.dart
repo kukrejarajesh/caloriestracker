@@ -34,4 +34,17 @@ class FoodsDao extends DatabaseAccessor<AppDatabase> with _$FoodsDaoMixin {
 
   Future<int> insertCustomFood(FoodsCompanion entry) =>
       into(foods).insert(entry);
+
+  /// Update an existing custom food (is_custom = 1 only).
+  Future<bool> updateCustomFood(int id, FoodsCompanion entry) async {
+    final rows = await (update(foods)
+          ..where((f) => f.id.equals(id) & f.isCustom.equals(1)))
+        .write(entry);
+    return rows > 0;
+  }
+
+  /// Batch insert multiple custom foods.
+  Future<void> insertCustomFoods(List<FoodsCompanion> entries) async {
+    await batch((b) => b.insertAll(foods, entries));
+  }
 }

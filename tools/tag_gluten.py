@@ -32,6 +32,20 @@ OVERRIDES: dict[str, str] = {
     "rasam": "gluten_free",
     "sambhar": "gluten_free",
     "sambar": "gluten_free",
+    # Millet/GF-grain rotis and flatbreads — "roti"/"paratha"/"puri" would mis-tag
+    "jowar roti": "gluten_free",      # sorghum flatbread
+    "bajra roti": "gluten_free",      # pearl millet flatbread
+    "ragi roti": "gluten_free",       # finger millet flatbread
+    "makki roti": "gluten_free",      # cornmeal flatbread
+    "nachni roti": "gluten_free",     # ragi synonym
+    "thalipeeth": "gluten_free",      # multigrain millet flatbread
+    "kuttu": "gluten_free",           # buckwheat — "paratha" would mis-tag
+    "singhara": "gluten_free",        # water chestnut flour — "puri" would mis-tag
+    "singhare": "gluten_free",        # water chestnut flour variant spelling
+    "rajgira": "gluten_free",         # amaranth — "roti"/"puri" would mis-tag
+    "rice flour dosa": "gluten_free", # plain rice flour dosa
+    "moong dal cheela": "gluten_free",# moong dal crepe
+    "ragi dosa": "gluten_free",       # finger millet dosa
 }
 
 # ---------------------------------------------------------------------------

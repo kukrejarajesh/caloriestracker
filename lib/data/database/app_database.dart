@@ -15,6 +15,7 @@ import '../daos/exercise_logs_dao.dart';
 import '../daos/water_logs_dao.dart';
 import '../daos/weight_logs_dao.dart';
 import '../daos/user_profile_dao.dart';
+import '../seed/db_seeder.dart';
 
 part 'app_database.g.dart';
 
@@ -40,8 +41,22 @@ part 'app_database.g.dart';
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
+  /// Constructor for tests — accepts any [QueryExecutor] (e.g. an in-memory
+  /// NativeDatabase). Example usage:
+  ///   AppDatabase.forTesting(NativeDatabase.memory())
+  AppDatabase.forTesting(QueryExecutor e) : super(e);
+
   @override
   int get schemaVersion => 1;
+
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+        onCreate: (Migrator m) async {
+          await m.createAll();
+          // After tables are created, seed foods and exercises from asset DBs.
+          await DbSeeder.seedInto(this);
+        },
+      );
 
   static QueryExecutor _openConnection() {
     return driftDatabase(name: 'calorie_tracker');
