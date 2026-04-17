@@ -1,12 +1,10 @@
 // ignore_for_file: lines_longer_than_80_chars
 
-import 'package:drift/drift.dart' show Value, FoodsCompanion, FoodLogsCompanion;
+import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:calorie_tracker/data/database/app_database.dart';
-import 'package:calorie_tracker/data/tables/foods_table.dart';
-import 'package:calorie_tracker/data/tables/food_logs_table.dart';
 
 /// Inserts a minimal food and returns its id.
 Future<int> _seedFood(AppDatabase db,
@@ -57,7 +55,10 @@ void main() {
   late AppDatabase db;
 
   setUp(() {
-    db = AppDatabase.forTesting(NativeDatabase.memory());
+    db = AppDatabase.forTesting(
+      NativeDatabase.memory(),
+      skipSeeding: true,
+    );
   });
 
   tearDown(() async {

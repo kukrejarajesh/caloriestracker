@@ -1,11 +1,10 @@
 // ignore_for_file: lines_longer_than_80_chars
 
-import 'package:drift/drift.dart' show Value, FoodsCompanion;
+import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:calorie_tracker/data/database/app_database.dart';
-import 'package:calorie_tracker/data/tables/foods_table.dart';
 
 /// Helper — inserts a minimal food row into the in-memory DB and returns its
 /// generated id.
@@ -31,7 +30,10 @@ void main() {
   late AppDatabase db;
 
   setUp(() {
-    db = AppDatabase.forTesting(NativeDatabase.memory());
+    db = AppDatabase.forTesting(
+      NativeDatabase.memory(),
+      skipSeeding: true,
+    );
   });
 
   tearDown(() async {

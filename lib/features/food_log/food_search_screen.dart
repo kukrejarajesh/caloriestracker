@@ -438,7 +438,7 @@ class _FoodDetailInlineState extends ConsumerState<_FoodDetailInline> {
                     builder: (_) => CustomFoodScreen(existingFood: food),
                   ),
                 );
-                if (edited == true && mounted) {
+                if (edited == true && context.mounted) {
                   Navigator.of(context).pop();
                 }
               },

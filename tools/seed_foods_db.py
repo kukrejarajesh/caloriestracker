@@ -1,13 +1,17 @@
 """
-seed_foods_db.py — Generates assets/foods.db with ~450 curated foods.
+seed_foods_db.py — Generates assets/foods.db with curated foods.
 
 Run from the tools/ directory:
     py seed_foods_db.py
 
 Requires: tag_gluten.py in the same directory, schema.sql in the same directory.
 Output:   ../assets/foods.db
+
+IMPORTANT: After running this, bump DbSeeder.currentSeedVersion in
+lib/data/seed/db_seeder.dart. Both changes must be in the same commit.
 """
 
+import re
 import sqlite3
 import sys
 from pathlib import Path
@@ -338,12 +342,99 @@ FOODS = [
     {"name": "Sugar (white)", "brand": None, "category": "Spices/Condiments", "calories_per_100g": 400, "protein_per_100g": 0.0, "carbs_per_100g": 100.0, "fat_per_100g": 0.0, "fiber_per_100g": 0.0, "sugar_per_100g": 100.0, "sodium_per_100mg": 1.0, "default_serving_g": 10, "serving_description": "1 tsp"},
     {"name": "Honey", "brand": None, "category": "Spices/Condiments", "calories_per_100g": 304, "protein_per_100g": 0.3, "carbs_per_100g": 82.4, "fat_per_100g": 0.0, "fiber_per_100g": 0.2, "sugar_per_100g": 82.1, "sodium_per_100mg": 4.0, "default_serving_g": 21, "serving_description": "1 tbsp"},
     {"name": "Salt (table)", "brand": None, "category": "Spices/Condiments", "calories_per_100g": 0, "protein_per_100g": 0.0, "carbs_per_100g": 0.0, "fat_per_100g": 0.0, "fiber_per_100g": 0.0, "sugar_per_100g": 0.0, "sodium_per_100mg": 38758.0, "default_serving_g": 5, "serving_description": "1 tsp"},
+
+    # ── Session 5 additions (seed version 2) — 50 new foods ───────────────
+
+    # Vegetables (10 new)
+    {"name": "Ash Gourd / Petha", "brand": None, "category": "Vegetables", "calories_per_100g": 10, "protein_per_100g": 0.4, "carbs_per_100g": 2.0, "fat_per_100g": 0.0, "fiber_per_100g": 0.5, "sugar_per_100g": 1.0, "sodium_per_100mg": 2.0, "default_serving_g": 100, "serving_description": "100g chopped"},
+    {"name": "Snake Gourd / Chichinda", "brand": None, "category": "Vegetables", "calories_per_100g": 18, "protein_per_100g": 0.5, "carbs_per_100g": 3.6, "fat_per_100g": 0.3, "fiber_per_100g": 0.6, "sugar_per_100g": 2.0, "sodium_per_100mg": 3.0, "default_serving_g": 100, "serving_description": "100g sliced"},
+    {"name": "Ivy Gourd / Tindora", "brand": None, "category": "Vegetables", "calories_per_100g": 18, "protein_per_100g": 1.2, "carbs_per_100g": 3.1, "fat_per_100g": 0.1, "fiber_per_100g": 1.6, "sugar_per_100g": 1.5, "sodium_per_100mg": 5.0, "default_serving_g": 100, "serving_description": "100g sliced"},
+    {"name": "Pointed Gourd / Parwal", "brand": None, "category": "Vegetables", "calories_per_100g": 20, "protein_per_100g": 2.0, "carbs_per_100g": 2.2, "fat_per_100g": 0.3, "fiber_per_100g": 3.0, "sugar_per_100g": 1.0, "sodium_per_100mg": 4.0, "default_serving_g": 100, "serving_description": "100g sliced"},
+    {"name": "Cluster Beans / Gawar Phali", "brand": None, "category": "Vegetables", "calories_per_100g": 16, "protein_per_100g": 3.2, "carbs_per_100g": 10.8, "fat_per_100g": 0.4, "fiber_per_100g": 3.2, "sugar_per_100g": 0.0, "sodium_per_100mg": 3.0, "default_serving_g": 100, "serving_description": "100g chopped"},
+    {"name": "Yam / Suran", "brand": None, "category": "Vegetables", "calories_per_100g": 118, "protein_per_100g": 1.5, "carbs_per_100g": 27.9, "fat_per_100g": 0.2, "fiber_per_100g": 4.1, "sugar_per_100g": 0.5, "sodium_per_100mg": 9.0, "default_serving_g": 100, "serving_description": "100g cubed"},
+    {"name": "Colocasia / Arbi", "brand": None, "category": "Vegetables", "calories_per_100g": 112, "protein_per_100g": 1.5, "carbs_per_100g": 26.5, "fat_per_100g": 0.2, "fiber_per_100g": 4.1, "sugar_per_100g": 0.4, "sodium_per_100mg": 11.0, "default_serving_g": 100, "serving_description": "100g cubed"},
+    {"name": "Raw Banana / Kachha Kela", "brand": None, "category": "Vegetables", "calories_per_100g": 116, "protein_per_100g": 1.3, "carbs_per_100g": 31.9, "fat_per_100g": 0.4, "fiber_per_100g": 2.3, "sugar_per_100g": 0.5, "sodium_per_100mg": 2.0, "default_serving_g": 100, "serving_description": "100g sliced"},
+    {"name": "Drumstick / Moringa Pods", "brand": None, "category": "Vegetables", "calories_per_100g": 37, "protein_per_100g": 2.1, "carbs_per_100g": 8.5, "fat_per_100g": 0.2, "fiber_per_100g": 3.2, "sugar_per_100g": 0.0, "sodium_per_100mg": 42.0, "default_serving_g": 100, "serving_description": "2-3 sticks"},
+    {"name": "Lotus Stem / Kamal Kakdi", "brand": None, "category": "Vegetables", "calories_per_100g": 74, "protein_per_100g": 2.6, "carbs_per_100g": 16.0, "fat_per_100g": 0.1, "fiber_per_100g": 4.9, "sugar_per_100g": 0.0, "sodium_per_100mg": 40.0, "default_serving_g": 100, "serving_description": "100g sliced"},
+
+    # Fruits (5 new)
+    {"name": "Jamun / Java Plum", "brand": None, "category": "Fruits", "calories_per_100g": 60, "protein_per_100g": 0.7, "carbs_per_100g": 15.6, "fat_per_100g": 0.2, "fiber_per_100g": 0.6, "sugar_per_100g": 14.0, "sodium_per_100mg": 14.0, "default_serving_g": 100, "serving_description": "10-12 fruits"},
+    {"name": "Wood Apple / Bael", "brand": None, "category": "Fruits", "calories_per_100g": 137, "protein_per_100g": 1.8, "carbs_per_100g": 31.8, "fat_per_100g": 0.3, "fiber_per_100g": 2.9, "sugar_per_100g": 28.0, "sodium_per_100mg": 0.0, "default_serving_g": 100, "serving_description": "pulp from 1 fruit"},
+    {"name": "Star Fruit / Kamrakh", "brand": None, "category": "Fruits", "calories_per_100g": 31, "protein_per_100g": 1.0, "carbs_per_100g": 6.7, "fat_per_100g": 0.3, "fiber_per_100g": 2.8, "sugar_per_100g": 4.0, "sodium_per_100mg": 2.0, "default_serving_g": 100, "serving_description": "1 medium fruit"},
+    {"name": "Indian Gooseberry / Amla", "brand": None, "category": "Fruits", "calories_per_100g": 44, "protein_per_100g": 0.9, "carbs_per_100g": 10.2, "fat_per_100g": 0.6, "fiber_per_100g": 4.3, "sugar_per_100g": 4.0, "sodium_per_100mg": 1.0, "default_serving_g": 50, "serving_description": "2-3 amla"},
+    {"name": "Custard Apple / Sitaphal", "brand": None, "category": "Fruits", "calories_per_100g": 101, "protein_per_100g": 1.6, "carbs_per_100g": 25.2, "fat_per_100g": 0.6, "fiber_per_100g": 2.4, "sugar_per_100g": 20.0, "sodium_per_100mg": 4.0, "default_serving_g": 100, "serving_description": "pulp from 1 fruit"},
+
+    # Legumes/Pulses (5 new)
+    {"name": "Horse Gram / Kulthi Dal", "brand": None, "category": "Legumes/Pulses", "calories_per_100g": 321, "protein_per_100g": 22.0, "carbs_per_100g": 57.2, "fat_per_100g": 0.5, "fiber_per_100g": 5.3, "sugar_per_100g": 1.0, "sodium_per_100mg": 28.0, "default_serving_g": 30, "serving_description": "30g dry"},
+    {"name": "Moth Bean / Matki (sprouted)", "brand": None, "category": "Legumes/Pulses", "calories_per_100g": 43, "protein_per_100g": 3.0, "carbs_per_100g": 6.5, "fat_per_100g": 0.4, "fiber_per_100g": 1.8, "sugar_per_100g": 1.0, "sodium_per_100mg": 6.0, "default_serving_g": 100, "serving_description": "1 katori sprouts"},
+    {"name": "Rajma / Kidney Beans (canned)", "brand": None, "category": "Legumes/Pulses", "calories_per_100g": 84, "protein_per_100g": 5.2, "carbs_per_100g": 14.0, "fat_per_100g": 0.3, "fiber_per_100g": 4.3, "sugar_per_100g": 1.0, "sodium_per_100mg": 256.0, "default_serving_g": 130, "serving_description": "1/2 can drained"},
+    {"name": "Green Peas (frozen)", "brand": None, "category": "Legumes/Pulses", "calories_per_100g": 77, "protein_per_100g": 5.4, "carbs_per_100g": 13.6, "fat_per_100g": 0.4, "fiber_per_100g": 4.5, "sugar_per_100g": 5.5, "sodium_per_100mg": 5.0, "default_serving_g": 80, "serving_description": "1 katori"},
+    {"name": "Val Dal / Field Beans (dry)", "brand": None, "category": "Legumes/Pulses", "calories_per_100g": 340, "protein_per_100g": 24.9, "carbs_per_100g": 60.1, "fat_per_100g": 0.8, "fiber_per_100g": 6.3, "sugar_per_100g": 2.0, "sodium_per_100mg": 12.0, "default_serving_g": 30, "serving_description": "30g dry"},
+
+    # Dairy (5 new)
+    {"name": "Lassi (sweet)", "brand": None, "category": "Dairy", "calories_per_100g": 70, "protein_per_100g": 2.8, "carbs_per_100g": 11.0, "fat_per_100g": 1.8, "fiber_per_100g": 0.0, "sugar_per_100g": 10.5, "sodium_per_100mg": 45.0, "default_serving_g": 250, "serving_description": "1 glass"},
+    {"name": "Chaas / Buttermilk (plain)", "brand": None, "category": "Dairy", "calories_per_100g": 19, "protein_per_100g": 1.5, "carbs_per_100g": 2.0, "fat_per_100g": 0.7, "fiber_per_100g": 0.0, "sugar_per_100g": 2.0, "sodium_per_100mg": 50.0, "default_serving_g": 250, "serving_description": "1 glass"},
+    {"name": "Shrikhand", "brand": None, "category": "Dairy", "calories_per_100g": 220, "protein_per_100g": 5.0, "carbs_per_100g": 35.0, "fat_per_100g": 7.0, "fiber_per_100g": 0.0, "sugar_per_100g": 32.0, "sodium_per_100mg": 40.0, "default_serving_g": 80, "serving_description": "1 katori"},
+    {"name": "Mishti Doi / Sweet Yogurt", "brand": None, "category": "Dairy", "calories_per_100g": 115, "protein_per_100g": 3.5, "carbs_per_100g": 18.0, "fat_per_100g": 3.5, "fiber_per_100g": 0.0, "sugar_per_100g": 17.0, "sodium_per_100mg": 40.0, "default_serving_g": 100, "serving_description": "1 small cup"},
+    {"name": "Mawa / Khoya", "brand": None, "category": "Dairy", "calories_per_100g": 321, "protein_per_100g": 14.6, "carbs_per_100g": 20.5, "fat_per_100g": 21.0, "fiber_per_100g": 0.0, "sugar_per_100g": 18.0, "sodium_per_100mg": 120.0, "default_serving_g": 30, "serving_description": "30g piece"},
+
+    # Fish/Seafood (5 new)
+    {"name": "Bangda / Indian Mackerel", "brand": None, "category": "Fish/Seafood", "calories_per_100g": 139, "protein_per_100g": 19.0, "carbs_per_100g": 0.0, "fat_per_100g": 6.3, "fiber_per_100g": 0.0, "sugar_per_100g": 0.0, "sodium_per_100mg": 90.0, "default_serving_g": 100, "serving_description": "1 fillet"},
+    {"name": "Surmai / Seer Fish", "brand": None, "category": "Fish/Seafood", "calories_per_100g": 109, "protein_per_100g": 22.0, "carbs_per_100g": 0.0, "fat_per_100g": 2.0, "fiber_per_100g": 0.0, "sugar_per_100g": 0.0, "sodium_per_100mg": 60.0, "default_serving_g": 100, "serving_description": "1 fillet"},
+    {"name": "Catla / Katla Fish", "brand": None, "category": "Fish/Seafood", "calories_per_100g": 97, "protein_per_100g": 17.0, "carbs_per_100g": 0.0, "fat_per_100g": 2.8, "fiber_per_100g": 0.0, "sugar_per_100g": 0.0, "sodium_per_100mg": 50.0, "default_serving_g": 100, "serving_description": "1 piece"},
+    {"name": "Bombay Duck / Bombil (dried)", "brand": None, "category": "Fish/Seafood", "calories_per_100g": 300, "protein_per_100g": 61.0, "carbs_per_100g": 0.0, "fat_per_100g": 5.0, "fiber_per_100g": 0.0, "sugar_per_100g": 0.0, "sodium_per_100mg": 800.0, "default_serving_g": 30, "serving_description": "2-3 pieces"},
+    {"name": "Squid / Calamari", "brand": None, "category": "Fish/Seafood", "calories_per_100g": 92, "protein_per_100g": 15.6, "carbs_per_100g": 3.1, "fat_per_100g": 1.4, "fiber_per_100g": 0.0, "sugar_per_100g": 0.0, "sodium_per_100mg": 44.0, "default_serving_g": 100, "serving_description": "100g cooked"},
+
+    # Meat/Poultry (5 new)
+    {"name": "Mutton Liver", "brand": None, "category": "Meat/Poultry", "calories_per_100g": 165, "protein_per_100g": 26.0, "carbs_per_100g": 3.8, "fat_per_100g": 5.0, "fiber_per_100g": 0.0, "sugar_per_100g": 0.0, "sodium_per_100mg": 87.0, "default_serving_g": 100, "serving_description": "100g cooked"},
+    {"name": "Chicken Drumstick (skinless)", "brand": None, "category": "Meat/Poultry", "calories_per_100g": 161, "protein_per_100g": 28.0, "carbs_per_100g": 0.0, "fat_per_100g": 5.2, "fiber_per_100g": 0.0, "sugar_per_100g": 0.0, "sodium_per_100mg": 90.0, "default_serving_g": 120, "serving_description": "1 drumstick"},
+    {"name": "Pork Belly", "brand": None, "category": "Meat/Poultry", "calories_per_100g": 518, "protein_per_100g": 9.3, "carbs_per_100g": 0.0, "fat_per_100g": 53.0, "fiber_per_100g": 0.0, "sugar_per_100g": 0.0, "sodium_per_100mg": 32.0, "default_serving_g": 85, "serving_description": "85g slice"},
+    {"name": "Duck Meat (roasted)", "brand": None, "category": "Meat/Poultry", "calories_per_100g": 201, "protein_per_100g": 23.5, "carbs_per_100g": 0.0, "fat_per_100g": 11.2, "fiber_per_100g": 0.0, "sugar_per_100g": 0.0, "sodium_per_100mg": 65.0, "default_serving_g": 100, "serving_description": "100g meat"},
+    {"name": "Quail / Bater (cooked)", "brand": None, "category": "Meat/Poultry", "calories_per_100g": 192, "protein_per_100g": 25.0, "carbs_per_100g": 0.0, "fat_per_100g": 9.6, "fiber_per_100g": 0.0, "sugar_per_100g": 0.0, "sodium_per_100mg": 52.0, "default_serving_g": 100, "serving_description": "1 quail"},
+
+    # Beverages (5 new)
+    {"name": "Nimbu Pani / Lemonade (Indian)", "brand": None, "category": "Beverages", "calories_per_100g": 25, "protein_per_100g": 0.1, "carbs_per_100g": 6.5, "fat_per_100g": 0.0, "fiber_per_100g": 0.1, "sugar_per_100g": 5.5, "sodium_per_100mg": 100.0, "default_serving_g": 250, "serving_description": "1 glass"},
+    {"name": "Jal Jeera", "brand": None, "category": "Beverages", "calories_per_100g": 15, "protein_per_100g": 0.2, "carbs_per_100g": 3.5, "fat_per_100g": 0.1, "fiber_per_100g": 0.3, "sugar_per_100g": 2.0, "sodium_per_100mg": 120.0, "default_serving_g": 250, "serving_description": "1 glass"},
+    {"name": "Thandai", "brand": None, "category": "Beverages", "calories_per_100g": 98, "protein_per_100g": 3.0, "carbs_per_100g": 12.0, "fat_per_100g": 4.5, "fiber_per_100g": 0.5, "sugar_per_100g": 10.0, "sodium_per_100mg": 30.0, "default_serving_g": 250, "serving_description": "1 glass"},
+    {"name": "Kokum Sharbat", "brand": None, "category": "Beverages", "calories_per_100g": 28, "protein_per_100g": 0.1, "carbs_per_100g": 7.0, "fat_per_100g": 0.0, "fiber_per_100g": 0.2, "sugar_per_100g": 6.0, "sodium_per_100mg": 15.0, "default_serving_g": 250, "serving_description": "1 glass"},
+    {"name": "Sattu Drink", "brand": None, "category": "Beverages", "calories_per_100g": 35, "protein_per_100g": 2.5, "carbs_per_100g": 6.0, "fat_per_100g": 0.5, "fiber_per_100g": 1.0, "sugar_per_100g": 3.0, "sodium_per_100mg": 80.0, "default_serving_g": 250, "serving_description": "1 glass"},
+
+    # Snacks (5 new — gluten-free Indian snacks)
+    {"name": "Makhana / Fox Nuts (roasted)", "brand": None, "category": "Snacks", "calories_per_100g": 332, "protein_per_100g": 9.7, "carbs_per_100g": 76.9, "fat_per_100g": 0.1, "fiber_per_100g": 14.5, "sugar_per_100g": 0.0, "sodium_per_100mg": 210.0, "default_serving_g": 30, "serving_description": "1 katori"},
+    {"name": "Kurmura Chivda (rice flakes)", "brand": None, "category": "Snacks", "calories_per_100g": 410, "protein_per_100g": 6.0, "carbs_per_100g": 65.0, "fat_per_100g": 14.0, "fiber_per_100g": 2.0, "sugar_per_100g": 3.0, "sodium_per_100mg": 350.0, "default_serving_g": 30, "serving_description": "1 katori"},
+    {"name": "Sabudana Vada", "brand": None, "category": "Snacks", "calories_per_100g": 300, "protein_per_100g": 4.5, "carbs_per_100g": 42.0, "fat_per_100g": 13.0, "fiber_per_100g": 1.5, "sugar_per_100g": 1.0, "sodium_per_100mg": 250.0, "default_serving_g": 40, "serving_description": "1 vada"},
+    {"name": "Rice Murukku / Chakli (rice)", "brand": None, "category": "Snacks", "calories_per_100g": 445, "protein_per_100g": 5.5, "carbs_per_100g": 60.0, "fat_per_100g": 20.0, "fiber_per_100g": 1.5, "sugar_per_100g": 1.0, "sodium_per_100mg": 300.0, "default_serving_g": 25, "serving_description": "2-3 pieces"},
+    {"name": "Roasted Chana / Bhuna Chana", "brand": None, "category": "Snacks", "calories_per_100g": 369, "protein_per_100g": 22.5, "carbs_per_100g": 58.1, "fat_per_100g": 5.2, "fiber_per_100g": 15.0, "sugar_per_100g": 5.0, "sodium_per_100mg": 24.0, "default_serving_g": 30, "serving_description": "1 katori"},
+
+    # Sweets/Desserts (5 new)
+    {"name": "Kalakand", "brand": None, "category": "Sweets/Desserts", "calories_per_100g": 310, "protein_per_100g": 8.5, "carbs_per_100g": 40.0, "fat_per_100g": 13.5, "fiber_per_100g": 0.0, "sugar_per_100g": 36.0, "sodium_per_100mg": 45.0, "default_serving_g": 30, "serving_description": "1 piece"},
+    {"name": "Sandesh", "brand": None, "category": "Sweets/Desserts", "calories_per_100g": 260, "protein_per_100g": 10.0, "carbs_per_100g": 35.0, "fat_per_100g": 10.0, "fiber_per_100g": 0.0, "sugar_per_100g": 32.0, "sodium_per_100mg": 45.0, "default_serving_g": 40, "serving_description": "1 piece"},
+    {"name": "Coconut Barfi", "brand": None, "category": "Sweets/Desserts", "calories_per_100g": 395, "protein_per_100g": 4.5, "carbs_per_100g": 50.0, "fat_per_100g": 20.0, "fiber_per_100g": 3.0, "sugar_per_100g": 45.0, "sodium_per_100mg": 30.0, "default_serving_g": 30, "serving_description": "1 piece"},
+    {"name": "Phirni", "brand": None, "category": "Sweets/Desserts", "calories_per_100g": 130, "protein_per_100g": 3.5, "carbs_per_100g": 20.0, "fat_per_100g": 4.0, "fiber_per_100g": 0.2, "sugar_per_100g": 16.0, "sodium_per_100mg": 35.0, "default_serving_g": 120, "serving_description": "1 katori"},
+    {"name": "Til Ladoo / Sesame Ladoo", "brand": None, "category": "Sweets/Desserts", "calories_per_100g": 460, "protein_per_100g": 12.0, "carbs_per_100g": 45.0, "fat_per_100g": 28.0, "fiber_per_100g": 5.0, "sugar_per_100g": 38.0, "sodium_per_100mg": 15.0, "default_serving_g": 25, "serving_description": "1 ladoo"},
 ]
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+def _slugify(s: str) -> str:
+    """Lowercase, replace non-alphanumeric runs with _, strip edge underscores.
+    Must match _slugify in lib/core/utils/seed_key.dart EXACTLY."""
+    out = s.strip().lower()
+    out = re.sub(r'[^a-z0-9]+', '_', out)
+    out = re.sub(r'^_+|_+$', '', out)
+    return out
+
+
+def _make_seed_key(name: str, brand: str | None) -> str:
+    """Deterministic key: '{name_slug}__{brand_slug}'.
+    Must match makeSeedKey in lib/core/utils/seed_key.dart EXACTLY."""
+    name_slug = _slugify(name)
+    brand_slug = _slugify(brand) if brand and brand.strip() else 'generic'
+    return f"{name_slug}__{brand_slug}"
+
 
 def _extract_ddl(schema_text: str, table_name: str) -> list[str]:
     """Extract CREATE TABLE and CREATE INDEX statements for a given table."""
@@ -399,6 +490,22 @@ def main() -> None:
     for stmt in ddl_statements:
         cur.execute(stmt)
 
+    # Compute seed_key for each food (must match makeSeedKey in seed_key.dart)
+    for food in FOODS:
+        food["seed_key"] = _make_seed_key(food["name"], food.get("brand"))
+
+    # Check for duplicate seed_keys — would cause reconciliation bugs
+    seen_keys: dict[str, str] = {}
+    for food in FOODS:
+        key = food["seed_key"]
+        if key in seen_keys:
+            print(f"ERROR: Duplicate seed_key '{key}'", file=sys.stderr)
+            print(f"  First:    {seen_keys[key]}", file=sys.stderr)
+            print(f"  Conflict: {food['name']}", file=sys.stderr)
+            sys.exit(1)
+        seen_keys[key] = food["name"]
+    print(f"  {len(seen_keys)} unique seed_keys — no duplicates.")
+
     # Insert all foods
     insert_sql = """
         INSERT INTO foods (
@@ -406,13 +513,13 @@ def main() -> None:
             calories_per_100g, protein_per_100g, carbs_per_100g, fat_per_100g,
             fiber_per_100g, sugar_per_100g, sodium_per_100mg,
             default_serving_g, serving_description,
-            is_gluten_free, gluten_status, is_custom
+            is_gluten_free, gluten_status, is_custom, seed_key
         ) VALUES (
             :name, :brand, :category,
             :calories_per_100g, :protein_per_100g, :carbs_per_100g, :fat_per_100g,
             :fiber_per_100g, :sugar_per_100g, :sodium_per_100mg,
             :default_serving_g, :serving_description,
-            :is_gluten_free, :gluten_status, 0
+            :is_gluten_free, :gluten_status, 0, :seed_key
         )
     """
     cur.executemany(insert_sql, FOODS)

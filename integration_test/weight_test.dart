@@ -25,17 +25,6 @@ void main() {
       await tapBottomNav(tester, 'Weight');
     }
 
-    Future<void> enterAndLogWeight(WidgetTester tester, String value) async {
-      final field = find.descendant(
-        of: find.byType(TextField),
-        matching: find.byType(EditableText),
-      ).first;
-      await tester.enterText(find.byType(TextField).first, value);
-      await tester.tap(find.widgetWithText(ElevatedButton, 'Log'));
-      await tester.pump(const Duration(milliseconds: 500));
-      await tester.pump(const Duration(milliseconds: 500));
-    }
-
     testWidgets(
       'Valid weight logs and appears in history',
       (tester) async {

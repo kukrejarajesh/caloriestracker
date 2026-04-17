@@ -191,6 +191,17 @@ class $FoodsTable extends Foods with TableInfo<$FoodsTable, Food> {
     requiredDuringInsert: false,
     defaultValue: const Constant(0),
   );
+  static const VerificationMeta _seedKeyMeta = const VerificationMeta(
+    'seedKey',
+  );
+  @override
+  late final GeneratedColumn<String> seedKey = GeneratedColumn<String>(
+    'seed_key',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -209,6 +220,7 @@ class $FoodsTable extends Foods with TableInfo<$FoodsTable, Food> {
     isGlutenFree,
     glutenStatus,
     isCustom,
+    seedKey,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -351,6 +363,12 @@ class $FoodsTable extends Foods with TableInfo<$FoodsTable, Food> {
         isCustom.isAcceptableOrUnknown(data['is_custom']!, _isCustomMeta),
       );
     }
+    if (data.containsKey('seed_key')) {
+      context.handle(
+        _seedKeyMeta,
+        seedKey.isAcceptableOrUnknown(data['seed_key']!, _seedKeyMeta),
+      );
+    }
     return context;
   }
 
@@ -424,6 +442,10 @@ class $FoodsTable extends Foods with TableInfo<$FoodsTable, Food> {
         DriftSqlType.int,
         data['${effectivePrefix}is_custom'],
       )!,
+      seedKey: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}seed_key'],
+      ),
     );
   }
 
@@ -450,6 +472,13 @@ class Food extends DataClass implements Insertable<Food> {
   final int isGlutenFree;
   final String glutenStatus;
   final int isCustom;
+
+  /// Stable identifier for seeded foods. NULL for custom user-added rows.
+  /// Used by the seed-data reconciliation flow (see DbSeeder) to detect which
+  /// seeded rows are already on-device vs newly shipped in a later release.
+  /// Computed by [makeSeedKey] (core/utils/seed_key.dart). Never change the
+  /// algorithm once a release has shipped.
+  final String? seedKey;
   const Food({
     required this.id,
     required this.name,
@@ -467,6 +496,7 @@ class Food extends DataClass implements Insertable<Food> {
     required this.isGlutenFree,
     required this.glutenStatus,
     required this.isCustom,
+    this.seedKey,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -497,6 +527,9 @@ class Food extends DataClass implements Insertable<Food> {
     map['is_gluten_free'] = Variable<int>(isGlutenFree);
     map['gluten_status'] = Variable<String>(glutenStatus);
     map['is_custom'] = Variable<int>(isCustom);
+    if (!nullToAbsent || seedKey != null) {
+      map['seed_key'] = Variable<String>(seedKey);
+    }
     return map;
   }
 
@@ -528,6 +561,9 @@ class Food extends DataClass implements Insertable<Food> {
       isGlutenFree: Value(isGlutenFree),
       glutenStatus: Value(glutenStatus),
       isCustom: Value(isCustom),
+      seedKey: seedKey == null && nullToAbsent
+          ? const Value.absent()
+          : Value(seedKey),
     );
   }
 
@@ -555,6 +591,7 @@ class Food extends DataClass implements Insertable<Food> {
       isGlutenFree: serializer.fromJson<int>(json['isGlutenFree']),
       glutenStatus: serializer.fromJson<String>(json['glutenStatus']),
       isCustom: serializer.fromJson<int>(json['isCustom']),
+      seedKey: serializer.fromJson<String?>(json['seedKey']),
     );
   }
   @override
@@ -577,6 +614,7 @@ class Food extends DataClass implements Insertable<Food> {
       'isGlutenFree': serializer.toJson<int>(isGlutenFree),
       'glutenStatus': serializer.toJson<String>(glutenStatus),
       'isCustom': serializer.toJson<int>(isCustom),
+      'seedKey': serializer.toJson<String?>(seedKey),
     };
   }
 
@@ -597,6 +635,7 @@ class Food extends DataClass implements Insertable<Food> {
     int? isGlutenFree,
     String? glutenStatus,
     int? isCustom,
+    Value<String?> seedKey = const Value.absent(),
   }) => Food(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -618,6 +657,7 @@ class Food extends DataClass implements Insertable<Food> {
     isGlutenFree: isGlutenFree ?? this.isGlutenFree,
     glutenStatus: glutenStatus ?? this.glutenStatus,
     isCustom: isCustom ?? this.isCustom,
+    seedKey: seedKey.present ? seedKey.value : this.seedKey,
   );
   Food copyWithCompanion(FoodsCompanion data) {
     return Food(
@@ -659,6 +699,7 @@ class Food extends DataClass implements Insertable<Food> {
           ? data.glutenStatus.value
           : this.glutenStatus,
       isCustom: data.isCustom.present ? data.isCustom.value : this.isCustom,
+      seedKey: data.seedKey.present ? data.seedKey.value : this.seedKey,
     );
   }
 
@@ -680,7 +721,8 @@ class Food extends DataClass implements Insertable<Food> {
           ..write('servingDescription: $servingDescription, ')
           ..write('isGlutenFree: $isGlutenFree, ')
           ..write('glutenStatus: $glutenStatus, ')
-          ..write('isCustom: $isCustom')
+          ..write('isCustom: $isCustom, ')
+          ..write('seedKey: $seedKey')
           ..write(')'))
         .toString();
   }
@@ -703,6 +745,7 @@ class Food extends DataClass implements Insertable<Food> {
     isGlutenFree,
     glutenStatus,
     isCustom,
+    seedKey,
   );
   @override
   bool operator ==(Object other) =>
@@ -723,7 +766,8 @@ class Food extends DataClass implements Insertable<Food> {
           other.servingDescription == this.servingDescription &&
           other.isGlutenFree == this.isGlutenFree &&
           other.glutenStatus == this.glutenStatus &&
-          other.isCustom == this.isCustom);
+          other.isCustom == this.isCustom &&
+          other.seedKey == this.seedKey);
 }
 
 class FoodsCompanion extends UpdateCompanion<Food> {
@@ -743,6 +787,7 @@ class FoodsCompanion extends UpdateCompanion<Food> {
   final Value<int> isGlutenFree;
   final Value<String> glutenStatus;
   final Value<int> isCustom;
+  final Value<String?> seedKey;
   const FoodsCompanion({
     this.id = const Value.absent(),
     this.name = const Value.absent(),
@@ -760,6 +805,7 @@ class FoodsCompanion extends UpdateCompanion<Food> {
     this.isGlutenFree = const Value.absent(),
     this.glutenStatus = const Value.absent(),
     this.isCustom = const Value.absent(),
+    this.seedKey = const Value.absent(),
   });
   FoodsCompanion.insert({
     this.id = const Value.absent(),
@@ -778,6 +824,7 @@ class FoodsCompanion extends UpdateCompanion<Food> {
     this.isGlutenFree = const Value.absent(),
     this.glutenStatus = const Value.absent(),
     this.isCustom = const Value.absent(),
+    this.seedKey = const Value.absent(),
   }) : name = Value(name),
        category = Value(category),
        caloriesPer100g = Value(caloriesPer100g);
@@ -798,6 +845,7 @@ class FoodsCompanion extends UpdateCompanion<Food> {
     Expression<int>? isGlutenFree,
     Expression<String>? glutenStatus,
     Expression<int>? isCustom,
+    Expression<String>? seedKey,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -816,6 +864,7 @@ class FoodsCompanion extends UpdateCompanion<Food> {
       if (isGlutenFree != null) 'is_gluten_free': isGlutenFree,
       if (glutenStatus != null) 'gluten_status': glutenStatus,
       if (isCustom != null) 'is_custom': isCustom,
+      if (seedKey != null) 'seed_key': seedKey,
     });
   }
 
@@ -836,6 +885,7 @@ class FoodsCompanion extends UpdateCompanion<Food> {
     Value<int>? isGlutenFree,
     Value<String>? glutenStatus,
     Value<int>? isCustom,
+    Value<String?>? seedKey,
   }) {
     return FoodsCompanion(
       id: id ?? this.id,
@@ -854,6 +904,7 @@ class FoodsCompanion extends UpdateCompanion<Food> {
       isGlutenFree: isGlutenFree ?? this.isGlutenFree,
       glutenStatus: glutenStatus ?? this.glutenStatus,
       isCustom: isCustom ?? this.isCustom,
+      seedKey: seedKey ?? this.seedKey,
     );
   }
 
@@ -908,6 +959,9 @@ class FoodsCompanion extends UpdateCompanion<Food> {
     if (isCustom.present) {
       map['is_custom'] = Variable<int>(isCustom.value);
     }
+    if (seedKey.present) {
+      map['seed_key'] = Variable<String>(seedKey.value);
+    }
     return map;
   }
 
@@ -929,7 +983,8 @@ class FoodsCompanion extends UpdateCompanion<Food> {
           ..write('servingDescription: $servingDescription, ')
           ..write('isGlutenFree: $isGlutenFree, ')
           ..write('glutenStatus: $glutenStatus, ')
-          ..write('isCustom: $isCustom')
+          ..write('isCustom: $isCustom, ')
+          ..write('seedKey: $seedKey')
           ..write(')'))
         .toString();
   }
@@ -3876,6 +3931,214 @@ class UserProfileCompanion extends UpdateCompanion<UserProfileData> {
   }
 }
 
+class $MetadataTable extends Metadata
+    with TableInfo<$MetadataTable, MetadataData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $MetadataTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _keyMeta = const VerificationMeta('key');
+  @override
+  late final GeneratedColumn<String> key = GeneratedColumn<String>(
+    'key',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _valueMeta = const VerificationMeta('value');
+  @override
+  late final GeneratedColumn<String> value = GeneratedColumn<String>(
+    'value',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [key, value];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'metadata';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<MetadataData> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('key')) {
+      context.handle(
+        _keyMeta,
+        key.isAcceptableOrUnknown(data['key']!, _keyMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_keyMeta);
+    }
+    if (data.containsKey('value')) {
+      context.handle(
+        _valueMeta,
+        value.isAcceptableOrUnknown(data['value']!, _valueMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_valueMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {key};
+  @override
+  MetadataData map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return MetadataData(
+      key: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}key'],
+      )!,
+      value: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}value'],
+      )!,
+    );
+  }
+
+  @override
+  $MetadataTable createAlias(String alias) {
+    return $MetadataTable(attachedDatabase, alias);
+  }
+}
+
+class MetadataData extends DataClass implements Insertable<MetadataData> {
+  final String key;
+  final String value;
+  const MetadataData({required this.key, required this.value});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['key'] = Variable<String>(key);
+    map['value'] = Variable<String>(value);
+    return map;
+  }
+
+  MetadataCompanion toCompanion(bool nullToAbsent) {
+    return MetadataCompanion(key: Value(key), value: Value(value));
+  }
+
+  factory MetadataData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return MetadataData(
+      key: serializer.fromJson<String>(json['key']),
+      value: serializer.fromJson<String>(json['value']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'key': serializer.toJson<String>(key),
+      'value': serializer.toJson<String>(value),
+    };
+  }
+
+  MetadataData copyWith({String? key, String? value}) =>
+      MetadataData(key: key ?? this.key, value: value ?? this.value);
+  MetadataData copyWithCompanion(MetadataCompanion data) {
+    return MetadataData(
+      key: data.key.present ? data.key.value : this.key,
+      value: data.value.present ? data.value.value : this.value,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('MetadataData(')
+          ..write('key: $key, ')
+          ..write('value: $value')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(key, value);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is MetadataData &&
+          other.key == this.key &&
+          other.value == this.value);
+}
+
+class MetadataCompanion extends UpdateCompanion<MetadataData> {
+  final Value<String> key;
+  final Value<String> value;
+  final Value<int> rowid;
+  const MetadataCompanion({
+    this.key = const Value.absent(),
+    this.value = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  MetadataCompanion.insert({
+    required String key,
+    required String value,
+    this.rowid = const Value.absent(),
+  }) : key = Value(key),
+       value = Value(value);
+  static Insertable<MetadataData> custom({
+    Expression<String>? key,
+    Expression<String>? value,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (key != null) 'key': key,
+      if (value != null) 'value': value,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  MetadataCompanion copyWith({
+    Value<String>? key,
+    Value<String>? value,
+    Value<int>? rowid,
+  }) {
+    return MetadataCompanion(
+      key: key ?? this.key,
+      value: value ?? this.value,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (key.present) {
+      map['key'] = Variable<String>(key.value);
+    }
+    if (value.present) {
+      map['value'] = Variable<String>(value.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('MetadataCompanion(')
+          ..write('key: $key, ')
+          ..write('value: $value, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -3886,6 +4149,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $WaterLogsTable waterLogs = $WaterLogsTable(this);
   late final $WeightLogsTable weightLogs = $WeightLogsTable(this);
   late final $UserProfileTable userProfile = $UserProfileTable(this);
+  late final $MetadataTable metadata = $MetadataTable(this);
   late final FoodsDao foodsDao = FoodsDao(this as AppDatabase);
   late final FoodLogsDao foodLogsDao = FoodLogsDao(this as AppDatabase);
   late final ExerciseLogsDao exerciseLogsDao = ExerciseLogsDao(
@@ -3896,6 +4160,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final UserProfileDao userProfileDao = UserProfileDao(
     this as AppDatabase,
   );
+  late final MetadataDao metadataDao = MetadataDao(this as AppDatabase);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -3908,6 +4173,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     waterLogs,
     weightLogs,
     userProfile,
+    metadata,
   ];
 }
 
@@ -3929,6 +4195,7 @@ typedef $$FoodsTableCreateCompanionBuilder =
       Value<int> isGlutenFree,
       Value<String> glutenStatus,
       Value<int> isCustom,
+      Value<String?> seedKey,
     });
 typedef $$FoodsTableUpdateCompanionBuilder =
     FoodsCompanion Function({
@@ -3948,6 +4215,7 @@ typedef $$FoodsTableUpdateCompanionBuilder =
       Value<int> isGlutenFree,
       Value<String> glutenStatus,
       Value<int> isCustom,
+      Value<String?> seedKey,
     });
 
 final class $$FoodsTableReferences
@@ -4059,6 +4327,11 @@ class $$FoodsTableFilterComposer extends Composer<_$AppDatabase, $FoodsTable> {
 
   ColumnFilters<int> get isCustom => $composableBuilder(
     column: $table.isCustom,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get seedKey => $composableBuilder(
+    column: $table.seedKey,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -4176,6 +4449,11 @@ class $$FoodsTableOrderingComposer
     column: $table.isCustom,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get seedKey => $composableBuilder(
+    column: $table.seedKey,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$FoodsTableAnnotationComposer
@@ -4257,6 +4535,9 @@ class $$FoodsTableAnnotationComposer
   GeneratedColumn<int> get isCustom =>
       $composableBuilder(column: $table.isCustom, builder: (column) => column);
 
+  GeneratedColumn<String> get seedKey =>
+      $composableBuilder(column: $table.seedKey, builder: (column) => column);
+
   Expression<T> foodLogsRefs<T extends Object>(
     Expression<T> Function($$FoodLogsTableAnnotationComposer a) f,
   ) {
@@ -4327,6 +4608,7 @@ class $$FoodsTableTableManager
                 Value<int> isGlutenFree = const Value.absent(),
                 Value<String> glutenStatus = const Value.absent(),
                 Value<int> isCustom = const Value.absent(),
+                Value<String?> seedKey = const Value.absent(),
               }) => FoodsCompanion(
                 id: id,
                 name: name,
@@ -4344,6 +4626,7 @@ class $$FoodsTableTableManager
                 isGlutenFree: isGlutenFree,
                 glutenStatus: glutenStatus,
                 isCustom: isCustom,
+                seedKey: seedKey,
               ),
           createCompanionCallback:
               ({
@@ -4363,6 +4646,7 @@ class $$FoodsTableTableManager
                 Value<int> isGlutenFree = const Value.absent(),
                 Value<String> glutenStatus = const Value.absent(),
                 Value<int> isCustom = const Value.absent(),
+                Value<String?> seedKey = const Value.absent(),
               }) => FoodsCompanion.insert(
                 id: id,
                 name: name,
@@ -4380,6 +4664,7 @@ class $$FoodsTableTableManager
                 isGlutenFree: isGlutenFree,
                 glutenStatus: glutenStatus,
                 isCustom: isCustom,
+                seedKey: seedKey,
               ),
           withReferenceMapper: (p0) => p0
               .map(
@@ -6253,6 +6538,145 @@ typedef $$UserProfileTableProcessedTableManager =
       UserProfileData,
       PrefetchHooks Function()
     >;
+typedef $$MetadataTableCreateCompanionBuilder =
+    MetadataCompanion Function({
+      required String key,
+      required String value,
+      Value<int> rowid,
+    });
+typedef $$MetadataTableUpdateCompanionBuilder =
+    MetadataCompanion Function({
+      Value<String> key,
+      Value<String> value,
+      Value<int> rowid,
+    });
+
+class $$MetadataTableFilterComposer
+    extends Composer<_$AppDatabase, $MetadataTable> {
+  $$MetadataTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get key => $composableBuilder(
+    column: $table.key,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get value => $composableBuilder(
+    column: $table.value,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$MetadataTableOrderingComposer
+    extends Composer<_$AppDatabase, $MetadataTable> {
+  $$MetadataTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get key => $composableBuilder(
+    column: $table.key,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get value => $composableBuilder(
+    column: $table.value,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$MetadataTableAnnotationComposer
+    extends Composer<_$AppDatabase, $MetadataTable> {
+  $$MetadataTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get key =>
+      $composableBuilder(column: $table.key, builder: (column) => column);
+
+  GeneratedColumn<String> get value =>
+      $composableBuilder(column: $table.value, builder: (column) => column);
+}
+
+class $$MetadataTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $MetadataTable,
+          MetadataData,
+          $$MetadataTableFilterComposer,
+          $$MetadataTableOrderingComposer,
+          $$MetadataTableAnnotationComposer,
+          $$MetadataTableCreateCompanionBuilder,
+          $$MetadataTableUpdateCompanionBuilder,
+          (
+            MetadataData,
+            BaseReferences<_$AppDatabase, $MetadataTable, MetadataData>,
+          ),
+          MetadataData,
+          PrefetchHooks Function()
+        > {
+  $$MetadataTableTableManager(_$AppDatabase db, $MetadataTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$MetadataTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$MetadataTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$MetadataTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> key = const Value.absent(),
+                Value<String> value = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => MetadataCompanion(key: key, value: value, rowid: rowid),
+          createCompanionCallback:
+              ({
+                required String key,
+                required String value,
+                Value<int> rowid = const Value.absent(),
+              }) => MetadataCompanion.insert(
+                key: key,
+                value: value,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$MetadataTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $MetadataTable,
+      MetadataData,
+      $$MetadataTableFilterComposer,
+      $$MetadataTableOrderingComposer,
+      $$MetadataTableAnnotationComposer,
+      $$MetadataTableCreateCompanionBuilder,
+      $$MetadataTableUpdateCompanionBuilder,
+      (
+        MetadataData,
+        BaseReferences<_$AppDatabase, $MetadataTable, MetadataData>,
+      ),
+      MetadataData,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -6271,4 +6695,6 @@ class $AppDatabaseManager {
       $$WeightLogsTableTableManager(_db, _db.weightLogs);
   $$UserProfileTableTableManager get userProfile =>
       $$UserProfileTableTableManager(_db, _db.userProfile);
+  $$MetadataTableTableManager get metadata =>
+      $$MetadataTableTableManager(_db, _db.metadata);
 }

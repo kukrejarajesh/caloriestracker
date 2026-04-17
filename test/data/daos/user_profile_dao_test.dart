@@ -1,11 +1,10 @@
 // ignore_for_file: lines_longer_than_80_chars
 
-import 'package:drift/drift.dart' show Value, UserProfileCompanion;
+import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:calorie_tracker/data/database/app_database.dart';
-import 'package:calorie_tracker/data/tables/user_profile_table.dart';
 
 /// Returns a fully-populated companion for quick inserts.
 UserProfileCompanion _buildProfile({
@@ -38,7 +37,10 @@ void main() {
   late AppDatabase db;
 
   setUp(() {
-    db = AppDatabase.forTesting(NativeDatabase.memory());
+    db = AppDatabase.forTesting(
+      NativeDatabase.memory(),
+      skipSeeding: true,
+    );
   });
 
   tearDown(() async {

@@ -19,12 +19,14 @@ CREATE TABLE foods (
   gluten_status TEXT NOT NULL DEFAULT 'unknown'
     CHECK(gluten_status IN 
       ('gluten_free','contains_gluten','may_contain','unknown')),
-  is_custom INTEGER NOT NULL DEFAULT 0
+  is_custom INTEGER NOT NULL DEFAULT 0,
+  seed_key TEXT
 );
 
 CREATE INDEX idx_foods_name ON foods(name);
 CREATE INDEX idx_foods_category ON foods(category);
 CREATE INDEX idx_foods_gluten ON foods(gluten_status);
+CREATE INDEX idx_foods_seed_key ON foods(seed_key);
 
 -- =====================
 -- FOOD LOGS TABLE

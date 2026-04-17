@@ -20,4 +20,11 @@ class Foods extends Table {
       .customConstraint(
           "NOT NULL DEFAULT 'unknown' CHECK(gluten_status IN ('gluten_free','contains_gluten','may_contain','unknown'))")();
   IntColumn get isCustom => integer().withDefault(const Constant(0))();
+
+  /// Stable identifier for seeded foods. NULL for custom user-added rows.
+  /// Used by the seed-data reconciliation flow (see DbSeeder) to detect which
+  /// seeded rows are already on-device vs newly shipped in a later release.
+  /// Computed by [makeSeedKey] (core/utils/seed_key.dart). Never change the
+  /// algorithm once a release has shipped.
+  TextColumn get seedKey => text().nullable()();
 }

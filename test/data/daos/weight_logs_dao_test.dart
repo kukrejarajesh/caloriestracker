@@ -4,7 +4,6 @@ import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:calorie_tracker/data/database/app_database.dart';
-import 'package:calorie_tracker/data/tables/weight_logs_table.dart';
 
 Future<int> _insertLog(AppDatabase db,
     {required String date, required double weightKg}) {
@@ -21,7 +20,10 @@ void main() {
   late AppDatabase db;
 
   setUp(() {
-    db = AppDatabase.forTesting(NativeDatabase.memory());
+    db = AppDatabase.forTesting(
+      NativeDatabase.memory(),
+      skipSeeding: true,
+    );
   });
 
   tearDown(() async {

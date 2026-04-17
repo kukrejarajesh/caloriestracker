@@ -123,6 +123,46 @@ tools/
 - Custom user-added foods go into foods table with is_custom = 1
 - Gluten status must be set for all custom foods — default to 'unknown'
 
+## Migration Strategy
+The app uses **two independent version numbers** so schema shape and seed content
+can evolve separately without overwriting user data:
+
+| Version | Where | What it tracks |
+|---|---|---|
+| `schemaVersion` (int) | `app_database.dart` | Table shape — columns, indexes, constraints |
+| `DbSeeder.currentSeedVersion` (int) | `db_seeder.dart` | Content of `assets/foods.db` + `assets/exercises.db` |
+
+The device stores its current seed version in the `metadata` table under key
+`seed_version` (see `DbSeeder.seedVersionKey`). Foods shipped via the asset DB
+are identified by a stable `seed_key` column (`slugify(name) + "__" + slugify(brand)`,
+computed by `core/utils/seed_key.dart`). Custom user rows have `seed_key = NULL`.
+
+### When to bump schemaVersion (table shape changes)
+1. Edit the table in `lib/data/tables/*.dart`
+2. Bump `schemaVersion` by 1 in `app_database.dart`
+3. Add a new `if (from < N)` block in `onUpgrade` — additive only, never touch
+   user-entered columns (food_logs, exercise_logs, water_logs, weight_logs, user_profile)
+4. Run `flutter pub run build_runner build --delete-conflicting-outputs`
+5. Dump the new schema: `dart run drift_dev schema dump lib/data/database/app_database.dart drift_schemas/`
+6. Test migration from every prior `drift_schemas/drift_schema_vN.json` snapshot
+
+### When to bump currentSeedVersion (seed content changes)
+1. Regenerate `assets/foods.db` via `tools/seed_foods_db.py` (and/or `assets/exercises.db`)
+2. Bump `DbSeeder.currentSeedVersion` by 1
+3. **Both steps must happen in the same commit** — the seed version is a claim
+   about the asset bytes. Updating one without the other silently breaks reconciliation.
+4. On next app launch the reconciler (Session 2) inserts missing `seed_key`s
+   additively. Existing rows — whether seeded or custom — are never modified.
+
+### Forbidden
+- DO NOT change the output of `makeSeedKey()` once a release has shipped — existing
+  devices would see every row as "new" and duplicate them all.
+- DO NOT edit an already-shipped `_upgradeToVN` migration. Write a new one.
+- DO NOT delete rows from `assets/foods.db` to "remove" a food — reconciliation
+  is additive. Mark it inactive at the DAO layer instead.
+- DO NOT run `DbSeeder.seedInto()` outside `onCreate`. It is for fresh installs only.
+- DO NOT commit changes to `drift_schemas/` by hand — only `drift_dev schema dump` writes them.
+
 ## Theme
 - System-aware: ThemeMode.system in MaterialApp
 - Light and dark ThemeData defined in app_theme.dart
