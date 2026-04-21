@@ -8,6 +8,7 @@ import 'generated/schema.dart';
 
 import 'generated/schema_v1.dart' as v1;
 import 'generated/schema_v2.dart' as v2;
+import 'generated/schema_v3.dart' as v3;
 
 void main() {
   driftRuntimeOptions.dontWarnAboutMultipleDatabases = true;
@@ -139,11 +140,13 @@ void main() {
         ),
       ];
 
+      // Migrating from v1 runs _upgradeToV2 AND _upgradeToV3 (since from=1 < 3),
+      // so the target schema is v3, not v2.
       await verifier.testWithDataIntegrity(
         oldVersion: 1,
-        newVersion: 2,
+        newVersion: 3,
         createOld: v1.DatabaseAtV1.new,
-        createNew: v2.DatabaseAtV2.new,
+        createNew: v3.DatabaseAtV3.new,
         openTestedDatabase: (e) =>
             AppDatabase.forTesting(e, skipSeeding: true),
         createItems: (batch, oldDb) {
@@ -175,12 +178,14 @@ void main() {
           expect(bread.glutenStatus, 'contains_gluten');
           expect(shake.isCustom, 1);
 
-          // -- FoodLogs: must survive untouched.
+          // -- FoodLogs: must survive untouched; v3 adds foodName (empty default).
           final logs = await newDb.select(newDb.foodLogs).get();
           expect(logs.length, 1);
           expect(logs.first.foodId, 1);
           expect(logs.first.calories, 106.8);
           expect(logs.first.glutenStatus, 'gluten_free');
+          expect(logs.first.foodName, '',
+              reason: 'pre-migration rows get empty-string default for foodName');
 
           // -- UserProfile: must survive untouched.
           final profiles = await newDb.select(newDb.userProfile).get();
@@ -204,16 +209,17 @@ void main() {
       );
     });
 
-    test('empty v1 database migrates to v2 cleanly', () async {
+    test('empty v1 database migrates to v3 cleanly', () async {
       // Edge case: a fresh v1 install that was never seeded.
+      // Migrating from v1 runs both _upgradeToV2 and _upgradeToV3.
       final schema = await verifier.schemaAt(1);
       final db = AppDatabase.forTesting(
         schema.newConnection(),
         skipSeeding: true,
       );
-      await verifier.migrateAndValidate(db, 2);
+      await verifier.migrateAndValidate(db, 3);
 
-      // Metadata table exists and has seed_version = 1.
+      // Metadata table exists and has seed_version = 1 (written by v2 migration).
       final metaRows = await db.select(db.metadata).get();
       expect(
         metaRows.any((m) => m.key == 'seed_version'),
@@ -264,11 +270,12 @@ void main() {
         ),
       ];
 
+      // Migrating from v1 runs both _upgradeToV2 and _upgradeToV3 → target v3.
       await verifier.testWithDataIntegrity(
         oldVersion: 1,
-        newVersion: 2,
+        newVersion: 3,
         createOld: v1.DatabaseAtV1.new,
-        createNew: v2.DatabaseAtV2.new,
+        createNew: v3.DatabaseAtV3.new,
         openTestedDatabase: (e) =>
             AppDatabase.forTesting(e, skipSeeding: true),
         createItems: (batch, oldDb) {
@@ -281,6 +288,8 @@ void main() {
           final logs = await newDb.select(newDb.foodLogs).get();
           expect(logs.length, 1);
           expect(logs.first.glutenStatus, 'may_contain');
+          // foodName defaults to '' for pre-migration rows.
+          expect(logs.first.foodName, '');
 
           // The food's gluten_status and is_gluten_free must survive too.
           final foods = await newDb.select(newDb.foods).get();

@@ -30,7 +30,9 @@ class ExerciseCard extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              '−${_totalBurned.round()} kcal',
+              _totalBurned == 0
+                  ? '0 kcal'
+                  : '−${_totalBurned.round()} kcal',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     fontWeight: FontWeight.w600,
                     color: AppColors.primary,
@@ -85,7 +87,7 @@ class _ExerciseLogTile extends StatelessWidget {
         child: Icon(Icons.directions_run, color: Colors.white, size: 16),
       ),
       title: Text(
-        'Exercise #${log.exerciseId}',
+        log.exerciseName.isNotEmpty ? log.exerciseName : 'Exercise #${log.exerciseId}',
         style: Theme.of(context).textTheme.bodyLarge,
       ),
       subtitle: Text(
@@ -96,7 +98,9 @@ class _ExerciseLogTile extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            '−${log.caloriesBurned.round()} kcal',
+            log.caloriesBurned == 0
+                ? '0 kcal'
+                : '−${log.caloriesBurned.round()} kcal',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   fontWeight: FontWeight.w600,
                   color: AppColors.primary,

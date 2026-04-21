@@ -79,7 +79,7 @@ class AppDatabase extends _$AppDatabase {
   ///        overwriting user data or custom entries. Reconciliation itself
   ///        runs on every launch via `beforeOpen` → [DbSeeder.reconcileInto].
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -101,12 +101,22 @@ class AppDatabase extends _$AppDatabase {
           );
         },
         onUpgrade: (Migrator m, int from, int to) async {
-          // Handle each version gate individually — safe for users who skip
-          // releases (e.g. v1 → v5 runs every `if (from < N)` block in order).
-          if (from < 2) {
+          // Each gate checks both floor (from < N) and ceiling (to >= N) so
+          // that the drift_dev migration-test framework can call onUpgrade with
+          // an intermediate `to` value (e.g. from=1, to=2) without accidentally
+          // running migrations beyond the requested target.
+          // In production, `to` is always `schemaVersion` (the latest), so all
+          // applicable blocks run in order — same as the old `if (from < N)`
+          // pattern.
+          if (from < 2 && to >= 2) {
             await _upgradeToV2(m);
           }
-          // Future: if (from < 3) { ... }
+          if (from < 3 && to >= 3) {
+            await _upgradeToV3(m);
+          }
+          if (from < 4 && to >= 4) {
+            await _upgradeToV4(m);
+          }
         },
         beforeOpen: (OpeningDetails details) async {
           // Fresh installs already wrote `seed_version = currentSeedVersion`
@@ -163,6 +173,31 @@ class AppDatabase extends _$AppDatabase {
     await metadataDao.setInt(DbSeeder.seedVersionKey, 1);
 
     debugPrint('AppDatabase: v2 migration complete');
+  }
+
+  /// v2 → v3 migration.
+  ///
+  /// Additive only — adds `food_name` to `food_logs` and `exercise_name`
+  /// to `exercise_logs` so the dashboard can display real names without a
+  /// JOIN on every render. Existing rows keep the empty-string default.
+  Future<void> _upgradeToV3(Migrator m) async {
+    debugPrint('AppDatabase: migrating v2 → v3 (add foodName/exerciseName)');
+    await m.addColumn(foodLogs, foodLogs.foodName);
+    await m.addColumn(exerciseLogs, exerciseLogs.exerciseName);
+    debugPrint('AppDatabase: v3 migration complete');
+  }
+
+  /// v3 → v4 migration.
+  ///
+  /// Additive only — adds `target_weight_kg` and `pace_kg_per_week` to
+  /// `user_profile` to support personalised calorie-target calculation.
+  /// Existing rows get NULL / 0.5 defaults and will continue to use the
+  /// legacy TDEE ± fixed-offset formula until the user sets a target weight.
+  Future<void> _upgradeToV4(Migrator m) async {
+    debugPrint('AppDatabase: migrating v3 → v4 (add targetWeightKg/paceKgPerWeek)');
+    await m.addColumn(userProfile, userProfile.targetWeightKg);
+    await m.addColumn(userProfile, userProfile.paceKgPerWeek);
+    debugPrint('AppDatabase: v4 migration complete');
   }
 
   static QueryExecutor _openConnection() {

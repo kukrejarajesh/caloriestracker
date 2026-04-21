@@ -70,6 +70,7 @@ class ExerciseLogNotifier extends _$ExerciseLogNotifier {
         ExerciseLogsCompanion(
           date: Value(date),
           exerciseId: Value(exercise.id),
+          exerciseName: Value(exercise.name),
           durationMinutes: Value(durationMinutes),
           caloriesBurned: Value(burned),
           loggedAt: Value(DateTime.now().toIso8601String()),

@@ -13,7 +13,10 @@ class FoodSearchScreen extends ConsumerStatefulWidget {
   /// The meal type passed from the dashboard (e.g. 'breakfast').
   final String mealType;
 
-  const FoodSearchScreen({super.key, required this.mealType});
+  /// The date to log food against (yyyy-MM-dd). Defaults to today if null.
+  final String? logDate;
+
+  const FoodSearchScreen({super.key, required this.mealType, this.logDate});
 
   @override
   ConsumerState<FoodSearchScreen> createState() => _FoodSearchScreenState();
@@ -26,11 +29,33 @@ class _FoodSearchScreenState extends ConsumerState<FoodSearchScreen> {
   @override
   void initState() {
     super.initState();
-    // Pre-set the meal type so detail screen picks it up
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(mealTypeNotifierProvider.notifier).set(widget.mealType);
       ref.read(searchQueryNotifierProvider.notifier).set('');
     });
+  }
+
+  /// Converts 'morning_snack' → 'Morning Snack'.
+  static String _titleCase(String s) => s
+      .split('_')
+      .map((w) => w[0].toUpperCase() + w.substring(1))
+      .join(' ');
+
+  static bool _isToday(String dateStr) {
+    final d = DateTime.tryParse(dateStr);
+    if (d == null) return true;
+    final now = DateTime.now();
+    return d.year == now.year && d.month == now.month && d.day == now.day;
+  }
+
+  static String _formatLogDate(String dateStr) {
+    final d = DateTime.tryParse(dateStr);
+    if (d == null) return dateStr;
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    ];
+    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    return '${days[d.weekday - 1]}, ${months[d.month - 1]} ${d.day}';
   }
 
   @override
@@ -53,10 +78,27 @@ class _FoodSearchScreenState extends ConsumerState<FoodSearchScreen> {
     final searchAsync = ref.watch(foodSearchProvider);
     final mealType = widget.mealType;
 
+    // Show the target date in the AppBar when logging for a past date so
+    // the user has clear confirmation of which day they're logging to (ENH-05).
+    final showDateBanner = widget.logDate != null && !_isToday(widget.logDate!);
+
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-            'Add to ${mealType[0].toUpperCase()}${mealType.substring(1)}'),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Add to ${_titleCase(mealType)}'),
+            if (showDateBanner)
+              Text(
+                'Logging for ${_formatLogDate(widget.logDate!)}',
+                style: const TextStyle(
+                    fontSize: 11,
+                    color: Colors.white70,
+                    fontWeight: FontWeight.normal),
+              ),
+          ],
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.upload_file),
@@ -164,6 +206,7 @@ class _FoodSearchScreenState extends ConsumerState<FoodSearchScreen> {
                   itemBuilder: (context, i) => _FoodResultTile(
                     food: foods[i],
                     mealType: mealType,
+                    logDate: widget.logDate,
                   ),
                 );
               },
@@ -209,8 +252,13 @@ class _GlutenFilterChip extends ConsumerWidget {
 class _FoodResultTile extends StatelessWidget {
   final Food food;
   final String mealType;
+  final String? logDate;
 
-  const _FoodResultTile({required this.food, required this.mealType});
+  const _FoodResultTile({
+    required this.food,
+    required this.mealType,
+    this.logDate,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -246,7 +294,11 @@ class _FoodResultTile extends StatelessWidget {
       trailing: GlutenBadge(glutenStatus: food.glutenStatus, compact: true),
       onTap: () => Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (_) => _FoodDetailRoute(food: food, mealType: mealType),
+          builder: (_) => _FoodDetailRoute(
+            food: food,
+            mealType: mealType,
+            logDate: logDate,
+          ),
         ),
       ),
     );
@@ -258,12 +310,21 @@ class _FoodResultTile extends StatelessWidget {
 class _FoodDetailRoute extends StatelessWidget {
   final Food food;
   final String mealType;
-  const _FoodDetailRoute({required this.food, required this.mealType});
+  final String? logDate;
+
+  const _FoodDetailRoute({
+    required this.food,
+    required this.mealType,
+    this.logDate,
+  });
 
   @override
   Widget build(BuildContext context) {
-    // Import here to avoid circular — detail screen is in same feature folder
-    return _FoodDetailScreenInternal(food: food, mealType: mealType);
+    return _FoodDetailScreenInternal(
+      food: food,
+      mealType: mealType,
+      logDate: logDate,
+    );
   }
 }
 
@@ -336,22 +397,50 @@ class _FoodDetailInline extends ConsumerStatefulWidget {
   final Food food;
   final String mealType;
 
-  const _FoodDetailInline({required this.food, required this.mealType});
+  /// Date to log food against (yyyy-MM-dd). Falls back to today if null.
+  final String? logDate;
+
+  const _FoodDetailInline({
+    required this.food,
+    required this.mealType,
+    this.logDate,
+  });
 
   @override
   ConsumerState<_FoodDetailInline> createState() => _FoodDetailInlineState();
 }
 
+/// Serving unit options with their conversion factor to grams.
+enum _ServingUnit {
+  g('g', 1.0),
+  ml('ml', 1.0),   // 1 ml ≈ 1 g (water density — good enough for nutrition)
+  oz('oz', 28.35),
+  cup('cup', 240.0),
+  piece('piece', 100.0); // fallback — user sees the actual gram total
+
+  const _ServingUnit(this.label, this.toGrams);
+  final String label;
+  final double toGrams;
+}
+
 class _FoodDetailInlineState extends ConsumerState<_FoodDetailInline> {
   late TextEditingController _qtyController;
-  late double _quantity;
+  late double _unitQuantity;   // what the user typed, in the selected unit
+  _ServingUnit _unit = _ServingUnit.g;
+
+  /// Local meal-type state — initialised from widget.mealType so the chip
+  /// pre-selects the meal the user came from (ENH-06).  Using a local field
+  /// avoids the autoDispose mealTypeNotifierProvider being disposed between
+  /// FoodSearchScreen.initState and this widget's first build.
+  late String _mealType;
 
   @override
   void initState() {
     super.initState();
-    _quantity = widget.food.defaultServingG;
+    _unitQuantity = widget.food.defaultServingG;
     _qtyController =
-        TextEditingController(text: _quantity.toStringAsFixed(0));
+        TextEditingController(text: _unitQuantity.toStringAsFixed(0));
+    _mealType = widget.mealType;
   }
 
   @override
@@ -359,6 +448,9 @@ class _FoodDetailInlineState extends ConsumerState<_FoodDetailInline> {
     _qtyController.dispose();
     super.dispose();
   }
+
+  /// Quantity in grams — what gets stored in the DB.
+  double get _quantity => _unitQuantity * _unit.toGrams;
 
   double get _ratio => _quantity / 100.0;
   double get _calories => widget.food.caloriesPer100g * _ratio;
@@ -417,10 +509,10 @@ class _FoodDetailInlineState extends ConsumerState<_FoodDetailInline> {
   Widget build(BuildContext context) {
     final food = widget.food;
     final logState = ref.watch(foodLogNotifierProvider);
-    final mealType = ref.watch(mealTypeNotifierProvider);
-    final now = DateTime.now();
-    final date =
-        '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    final date = widget.logDate ?? () {
+      final now = DateTime.now();
+      return '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    }();
     final status = GlutenStatus.fromString(food.glutenStatus);
     final isRisky = GlutenUtils.isRisky(status);
 
@@ -444,6 +536,48 @@ class _FoodDetailInlineState extends ConsumerState<_FoodDetailInline> {
               },
             ),
         ],
+      ),
+      // Sticky log button — always visible regardless of scroll position
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (logState.error != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Text(logState.error!,
+                      style: TextStyle(
+                          color: Theme.of(context).colorScheme.error)),
+                ),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: logState.isLogging
+                      ? null
+                      : () => _confirmAndLog(_mealType, date),
+                  icon: logState.isLogging
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white),
+                        )
+                      : Icon(isRisky
+                          ? Icons.warning_amber_outlined
+                          : Icons.add_circle_outline),
+                  label: Text(isRisky ? 'Log with Warning' : 'Log Food'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: isRisky
+                        ? AppColors.glutenWarningLight
+                        : AppColors.primary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -475,22 +609,46 @@ class _FoodDetailInlineState extends ConsumerState<_FoodDetailInline> {
             Row(
               children: [
                 SizedBox(
-                  width: 120,
+                  width: 110,
                   child: TextField(
                     controller: _qtyController,
                     keyboardType: const TextInputType.numberWithOptions(
                         decimal: true),
-                    decoration: const InputDecoration(suffixText: 'g'),
+                    decoration: const InputDecoration(
+                      contentPadding:
+                          EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                    ),
                     onChanged: (v) {
                       final d = double.tryParse(v);
-                      if (d != null && d > 0) setState(() => _quantity = d);
+                      if (d != null && d > 0) {
+                        setState(() => _unitQuantity = d);
+                      }
                     },
                   ),
                 ),
+                const SizedBox(width: 8),
+                DropdownButton<_ServingUnit>(
+                  value: _unit,
+                  underline: const SizedBox.shrink(),
+                  items: _ServingUnit.values
+                      .map((u) => DropdownMenuItem(
+                            value: u,
+                            child: Text(u.label),
+                          ))
+                      .toList(),
+                  onChanged: (u) {
+                    if (u != null) setState(() => _unit = u);
+                  },
+                ),
                 const SizedBox(width: 12),
                 if (food.servingDescription != null)
-                  Text(food.servingDescription!,
-                      style: Theme.of(context).textTheme.bodyMedium),
+                  Expanded(
+                    child: Text(
+                      food.servingDescription!,
+                      style: Theme.of(context).textTheme.bodyMedium,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
               ],
             ),
             const SizedBox(height: 20),
@@ -520,43 +678,9 @@ class _FoodDetailInlineState extends ConsumerState<_FoodDetailInline> {
             Text('Meal', style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 8),
             _MealTypeSelector(
-              selected: mealType,
-              onSelected: (v) =>
-                  ref.read(mealTypeNotifierProvider.notifier).set(v),
+              selected: _mealType,
+              onSelected: (v) => setState(() => _mealType = v),
             ),
-            const SizedBox(height: 24),
-
-            // ── Log button ─────────────────────────────────────────────
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: logState.isLogging
-                    ? null
-                    : () => _confirmAndLog(mealType, date),
-                icon: logState.isLogging
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                            strokeWidth: 2, color: Colors.white),
-                      )
-                    : Icon(isRisky
-                        ? Icons.warning_amber_outlined
-                        : Icons.add_circle_outline),
-                label: Text(isRisky ? 'Log with Warning' : 'Log Food'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor:
-                      isRisky ? AppColors.glutenWarningLight : AppColors.primary,
-                ),
-              ),
-            ),
-            if (logState.error != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Text(logState.error!,
-                    style: TextStyle(
-                        color: Theme.of(context).colorScheme.error)),
-              ),
           ],
         ),
       ),
@@ -676,10 +800,12 @@ class _MealTypeSelector extends StatelessWidget {
       {required this.selected, required this.onSelected});
 
   static const _meals = [
-    ('breakfast', 'Breakfast'),
-    ('lunch', 'Lunch'),
-    ('dinner', 'Dinner'),
-    ('snacks', 'Snacks'),
+    ('breakfast',     'Breakfast'),
+    ('morning_snack', 'Morning Snack'),
+    ('lunch',         'Lunch'),
+    ('evening_snack', 'Evening Snack'),
+    ('dinner',        'Dinner'),
+    ('snacks',        'Snacks'),
   ];
 
   @override

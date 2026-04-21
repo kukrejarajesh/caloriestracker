@@ -92,6 +92,7 @@ class FoodLogNotifier extends _$FoodLogNotifier {
           date: Value(date),
           mealType: Value(mealType),
           foodId: Value(food.id),
+          foodName: Value(food.name),
           quantityG: Value(quantityG),
           calories: Value(food.caloriesPer100g * ratio),
           protein: Value(food.proteinPer100g * ratio),

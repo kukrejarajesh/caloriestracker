@@ -89,8 +89,11 @@ Future<void> seedCompletedProfile(AppDatabase db) async {
 }
 
 /// Pumps the app with [db] injected via ProviderScope override.
-/// Uses pump(500ms) × 2 instead of pumpAndSettle to avoid hanging on
+/// Uses pump(500ms) × 3 instead of pumpAndSettle to avoid hanging on
 /// the dashboardProvider Drift stream that never completes.
+/// Three pumps are needed because the dashboard StreamController now merges
+/// two independent streams (food logs + exercise logs); each sub emits one
+/// initial event, so an extra settling pump is required (ENH-02).
 Future<void> pumpApp(WidgetTester tester, AppDatabase db) async {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
   await tester.pumpWidget(
@@ -101,6 +104,7 @@ Future<void> pumpApp(WidgetTester tester, AppDatabase db) async {
       child: const CalorieTrackerApp(),
     ),
   );
+  await tester.pump(const Duration(milliseconds: 500));
   await tester.pump(const Duration(milliseconds: 500));
   await tester.pump(const Duration(milliseconds: 500));
 }

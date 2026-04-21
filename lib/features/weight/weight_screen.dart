@@ -1,8 +1,10 @@
+import 'package:drift/drift.dart' show Value;
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../core/utils/tdee_calculator.dart';
 import '../../data/database/app_database.dart';
 import '../dashboard/dashboard_provider.dart';
 import 'weight_provider.dart';
@@ -56,7 +58,93 @@ class _WeightBodyState extends ConsumerState<_WeightBody> {
     }
     await ref.read(weightNotifierProvider.notifier).logWeight(kg);
     _controller.clear();
-    if (mounted) {
+
+    // Recalculate calorie target with the new weight and update profile.
+    if (!mounted) return;
+    final db = ref.read(appDatabaseProvider);
+    final profile = await db.userProfileDao.getProfile();
+    if (profile != null && mounted) {
+      final age = TdeeCalculator.ageFromDob(
+          profile.dateOfBirth ?? '1990-01-01');
+      final bmr = TdeeCalculator.bmr(
+        weightKg: kg,
+        heightCm: profile.heightCm ?? 170,
+        ageYears: age,
+        gender: profile.gender ?? 'male',
+      );
+      final tdeeVal = TdeeCalculator.tdee(
+        bmr: bmr,
+        activityLevel: profile.activityLevel ?? 'moderately_active',
+      );
+      final goalType = profile.goalType ?? 'maintain';
+      final pace = profile.paceKgPerWeek;
+      final newTarget =
+          (profile.targetWeightKg != null && goalType != 'maintain')
+              ? TdeeCalculator.personalizedCalorieTarget(
+                  tdeeValue: tdeeVal,
+                  goalType: goalType,
+                  paceKgPerWeek: pace,
+                  gender: profile.gender ?? 'male',
+                )
+              : TdeeCalculator.calorieTarget(tdeeVal, goalType);
+      final macros = TdeeCalculator.macroTargets(newTarget, goalType);
+
+      await db.userProfileDao.upsertProfile(
+        UserProfileCompanion(
+          id: const Value(1),
+          weightKg: Value(kg),
+          calorieTarget: Value(newTarget),
+          proteinTargetG: Value(macros.proteinG),
+          carbsTargetG: Value(macros.carbsG),
+          fatTargetG: Value(macros.fatG),
+        ),
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+                'Daily target updated to ${newTarget.round()} kcal based on your new weight'),
+            backgroundColor: AppColors.primary,
+          ),
+        );
+      }
+
+      // Goal reached check
+      final targetWt = profile.targetWeightKg;
+      final reached = targetWt != null &&
+          ((goalType == 'lose' && kg <= targetWt) ||
+              (goalType == 'gain' && kg >= targetWt));
+      if (reached && mounted) {
+        showDialog(
+          context: context,
+          builder: (_) => AlertDialog(
+            title: const Text("You've reached your goal!"),
+            content:
+                const Text('Would you like to switch to Maintain?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Not yet'),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  Navigator.pop(context);
+                  await db.userProfileDao.upsertProfile(
+                    const UserProfileCompanion(
+                      id: Value(1),
+                      goalType: Value('maintain'),
+                    ),
+                  );
+                },
+                child: const Text('Switch to Maintain'),
+              ),
+            ],
+          ),
+        );
+      }
+    } else if (mounted) {
+      // Fallback if no profile yet — just confirm the log
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Weight logged: ${kg}kg'),
@@ -109,7 +197,7 @@ class _WeightBodyState extends ConsumerState<_WeightBody> {
 
         // ── Chart ──────────────────────────────────────────────────────
         if (recent.length >= 2) ...[
-          Text('Last ${recent.length} entries',
+          Text('Weight Log',
               style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 12),
           SizedBox(
@@ -177,11 +265,10 @@ class _WeightChart extends StatelessWidget {
         .clamp(0.0, double.infinity);
     final maxY = weights.reduce((a, b) => a > b ? a : b) + 2;
 
-    final lineColor = goalType == 'lose'
-        ? AppColors.glutenWarningLight
-        : goalType == 'gain'
-            ? AppColors.primary
-            : AppColors.water;
+    // Green for all goals — a downward trend is positive for "lose",
+    // upward for "gain", and stable for "maintain". Red would feel alarming
+    // regardless of direction, so we always use the brand primary green.
+    const lineColor = AppColors.primary;
 
     return LineChart(
       LineChartData(

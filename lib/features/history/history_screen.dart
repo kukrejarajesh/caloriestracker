@@ -74,7 +74,14 @@ class HistoryScreen extends ConsumerWidget {
               const SizedBox(height: 12),
 
               // ── Meal sections (read-only) ─────────────────────────────
-              for (final meal in ['breakfast', 'lunch', 'dinner', 'snacks'])
+              for (final meal in [
+                'breakfast',
+                'morning_snack',
+                'lunch',
+                'evening_snack',
+                'dinner',
+                'snacks',
+              ])
                 MealSection(
                   mealType: meal,
                   logs: data.logsForMeal(meal),
@@ -150,6 +157,21 @@ class _DateNavBar extends StatelessWidget {
     required this.onNext,
   });
 
+  String _formatNavDate(String dateStr) {
+    final d = DateTime.tryParse(dateStr);
+    if (d == null) return dateStr;
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    ];
+    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    final now = DateTime.now();
+    if (d.year == now.year && d.month == now.month && d.day == now.day) {
+      return 'Today';
+    }
+    return '${days[d.weekday - 1]}, ${months[d.month - 1]} ${d.day}';
+  }
+
   @override
   Widget build(BuildContext context) {
     final d = DateTime.tryParse(selectedDate);
@@ -169,7 +191,7 @@ class _DateNavBar extends StatelessWidget {
             color: AppColors.primary,
           ),
           Text(
-            selectedDate,
+            _formatNavDate(selectedDate),
             style: Theme.of(context).textTheme.titleMedium,
           ),
           IconButton(

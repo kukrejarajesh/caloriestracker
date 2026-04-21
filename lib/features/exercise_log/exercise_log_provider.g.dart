@@ -42,7 +42,7 @@ final exerciseSearchQueryProvider =
 
 typedef _$ExerciseSearchQuery = AutoDisposeNotifier<String>;
 String _$exerciseLogNotifierHash() =>
-    r'1af76fd1e7e13411a58816babfaffe4a95dab6e9';
+    r'510c58d3907fbe343748b02f3938ad9de4a893e9';
 
 /// See also [ExerciseLogNotifier].
 @ProviderFor(ExerciseLogNotifier)

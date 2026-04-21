@@ -17,6 +17,8 @@ class OnboardingFormState {
   final double? weightKg;
   final String? activityLevel;
   final String? goalType;
+  final double? targetWeightKg; // null = not set (or maintain goal)
+  final double paceKgPerWeek;   // default 0.5 kg/week
   final bool isGlutenFree;
   final bool isSaving;
   final String? error;
@@ -29,6 +31,8 @@ class OnboardingFormState {
     this.weightKg,
     this.activityLevel,
     this.goalType,
+    this.targetWeightKg,
+    this.paceKgPerWeek = 0.5,
     this.isGlutenFree = true,
     this.isSaving = false,
     this.error,
@@ -42,6 +46,8 @@ class OnboardingFormState {
     double? weightKg,
     String? activityLevel,
     String? goalType,
+    Object? targetWeightKg = _sentinel,
+    double? paceKgPerWeek,
     bool? isGlutenFree,
     bool? isSaving,
     String? error,
@@ -54,11 +60,17 @@ class OnboardingFormState {
       weightKg: weightKg ?? this.weightKg,
       activityLevel: activityLevel ?? this.activityLevel,
       goalType: goalType ?? this.goalType,
+      targetWeightKg: targetWeightKg == _sentinel
+          ? this.targetWeightKg
+          : targetWeightKg as double?,
+      paceKgPerWeek: paceKgPerWeek ?? this.paceKgPerWeek,
       isGlutenFree: isGlutenFree ?? this.isGlutenFree,
       isSaving: isSaving ?? this.isSaving,
       error: error,
     );
   }
+
+  static const _sentinel = Object();
 }
 
 // ── Notifier ──────────────────────────────────────────────────────────────────
@@ -75,6 +87,9 @@ class OnboardingNotifier extends _$OnboardingNotifier {
   void setWeightKg(double v) => state = state.copyWith(weightKg: v);
   void setActivityLevel(String v) => state = state.copyWith(activityLevel: v);
   void setGoalType(String v) => state = state.copyWith(goalType: v);
+  void setTargetWeightKg(double? v) =>
+      state = state.copyWith(targetWeightKg: v);
+  void setPaceKgPerWeek(double v) => state = state.copyWith(paceKgPerWeek: v);
   void setIsGlutenFree(bool v) => state = state.copyWith(isGlutenFree: v);
 
   /// Validates that all required fields are present before saving.
@@ -111,10 +126,19 @@ class OnboardingNotifier extends _$OnboardingNotifier {
         bmr: bmr,
         activityLevel: s.activityLevel!,
       );
+
+      // Use personalised target when target weight is set; legacy fallback otherwise.
       final calorieTarget =
-          TdeeCalculator.calorieTarget(tdeeVal, s.goalType!);
-      final macros =
-          TdeeCalculator.macroTargets(calorieTarget, s.goalType!);
+          (s.targetWeightKg != null && s.goalType != 'maintain')
+              ? TdeeCalculator.personalizedCalorieTarget(
+                  tdeeValue: tdeeVal,
+                  goalType: s.goalType!,
+                  paceKgPerWeek: s.paceKgPerWeek,
+                  gender: s.gender!,
+                )
+              : TdeeCalculator.calorieTarget(tdeeVal, s.goalType!);
+
+      final macros = TdeeCalculator.macroTargets(calorieTarget, s.goalType!);
 
       await db.userProfileDao.upsertProfile(
         UserProfileCompanion(
@@ -130,6 +154,8 @@ class OnboardingNotifier extends _$OnboardingNotifier {
           proteinTargetG: Value(macros.proteinG),
           carbsTargetG: Value(macros.carbsG),
           fatTargetG: Value(macros.fatG),
+          targetWeightKg: Value(s.targetWeightKg),
+          paceKgPerWeek: Value(s.paceKgPerWeek),
           isGlutenFree: Value(s.isGlutenFree ? 1 : 0),
           onboardingComplete: const Value(1),
         ),
@@ -147,7 +173,9 @@ class OnboardingNotifier extends _$OnboardingNotifier {
 // ── Onboarding complete check ─────────────────────────────────────────────────
 
 @riverpod
-Future<bool> onboardingComplete(Ref ref) async {
+Stream<bool> onboardingComplete(Ref ref) {
   final db = ref.watch(appDatabaseProvider);
-  return db.userProfileDao.isOnboardingComplete();
+  return db.userProfileDao
+      .watchProfile()
+      .map((profile) => (profile?.onboardingComplete ?? 0) == 1);
 }

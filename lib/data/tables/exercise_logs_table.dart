@@ -5,6 +5,7 @@ class ExerciseLogs extends Table {
   IntColumn get id => integer().autoIncrement()();
   TextColumn get date => text()();
   IntColumn get exerciseId => integer().references(Exercises, #id)();
+  TextColumn get exerciseName => text().withDefault(const Constant(''))();
   IntColumn get durationMinutes => integer()();
   RealColumn get caloriesBurned => real()();
   TextColumn get loggedAt => text()();

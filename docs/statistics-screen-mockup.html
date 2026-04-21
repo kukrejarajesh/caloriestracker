@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Statistics Screen — CalorieTracker Mockup</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #f0f0f0;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    min-height: 100vh;
+    padding: 32px 16px;
+    gap: 40px;
+    flex-wrap: wrap;
+  }
+
+  .phone-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+  .phone-label {
+    font-size: 13px;
+    color: #666;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+
+  /* ── PHONE SHELL ── */
+  .phone {
+    width: 320px;
+    height: 693px;
+    background: #f5f5f5;
+    border-radius: 40px;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.10);
+    overflow: hidden;
+    border: 6px solid #1a1a1a;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* status bar */
+  .status-bar {
+    background: #1B5E20;
+    color: white;
+    font-size: 11px;
+    padding: 6px 20px 4px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-shrink: 0;
+  }
+  .status-bar .notch {
+    width: 14px; height: 14px;
+    background: #1a1a1a;
+    border-radius: 50%;
+  }
+
+  /* app header */
+  .app-header {
+    background: #1B5E20;
+    color: white;
+    padding: 10px 16px 14px;
+    flex-shrink: 0;
+  }
+  .app-header h1 {
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+  }
+
+  /* period toggle */
+  .period-toggle {
+    display: flex;
+    background: rgba(255,255,255,0.15);
+    border-radius: 8px;
+    padding: 3px;
+    gap: 2px;
+    margin-top: 10px;
+    width: fit-content;
+  }
+  .period-btn {
+    padding: 4px 16px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    color: rgba(255,255,255,0.7);
+    cursor: pointer;
+    border: none;
+    background: transparent;
+  }
+  .period-btn.active {
+    background: white;
+    color: #1B5E20;
+  }
+
+  /* scrollable content */
+  .screen-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px 12px 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    background: #f5f5f5;
+    scrollbar-width: none;
+  }
+  .screen-content::-webkit-scrollbar { display: none; }
+
+  /* cards */
+  .card {
+    background: white;
+    border-radius: 14px;
+    padding: 14px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+  }
+  .card-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: #757575;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    margin-bottom: 10px;
+  }
+
+  /* ── STREAK + DAYS ROW ── */
+  .stats-row {
+    display: flex;
+    gap: 10px;
+  }
+  .mini-card {
+    flex: 1;
+    background: white;
+    border-radius: 14px;
+    padding: 12px 10px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+  }
+  .mini-card .emoji { font-size: 22px; line-height: 1; margin-bottom: 2px; }
+  .mini-card .big-val {
+    font-size: 26px;
+    font-weight: 800;
+    color: #1B5E20;
+    line-height: 1;
+  }
+  .mini-card .sub {
+    font-size: 10px;
+    color: #9e9e9e;
+    font-weight: 500;
+    text-align: center;
+    margin-top: 2px;
+  }
+  .mini-card .fraction {
+    font-size: 11px;
+    font-weight: 700;
+    color: #388E3C;
+  }
+  /* dot indicators */
+  .dot-row {
+    display: flex;
+    gap: 3px;
+    margin-top: 4px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: #E8F5E9;
+    border: 1.5px solid #A5D6A7;
+  }
+  .dot.hit { background: #388E3C; border-color: #388E3C; }
+  .dot.miss { background: #EF9A9A; border-color: #E53935; }
+
+  /* ── CALORIE BAR CHART ── */
+  .chart-area {
+    display: flex;
+    align-items: flex-end;
+    gap: 6px;
+    height: 110px;
+    position: relative;
+    padding-top: 16px;
+  }
+  .bar-group {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    height: 100%;
+    justify-content: flex-end;
+  }
+  .bar-outer {
+    width: 100%;
+    background: #F5F5F5;
+    border-radius: 5px 5px 0 0;
+    position: relative;
+    display: flex;
+    align-items: flex-end;
+    overflow: hidden;
+  }
+  .bar-fill {
+    width: 100%;
+    border-radius: 5px 5px 0 0;
+    transition: height 0.3s ease;
+    position: relative;
+  }
+  .bar-label {
+    font-size: 9px;
+    color: #9e9e9e;
+    font-weight: 600;
+  }
+  .bar-val {
+    font-size: 8px;
+    color: #616161;
+    font-weight: 700;
+    position: absolute;
+    top: -13px;
+    left: 50%;
+    transform: translateX(-50%);
+    white-space: nowrap;
+  }
+
+  /* target line */
+  .target-line-container {
+    position: absolute;
+    left: 0; right: 0;
+    pointer-events: none;
+  }
+  .target-line {
+    position: absolute;
+    left: 0; right: 0;
+    border-top: 1.5px dashed #E53935;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+  }
+  .target-line-label {
+    font-size: 8px;
+    color: #E53935;
+    font-weight: 700;
+    background: white;
+    padding: 0 2px;
+    margin-right: 0;
+    white-space: nowrap;
+  }
+  .chart-legend {
+    display: flex;
+    gap: 12px;
+    margin-top: 8px;
+    justify-content: center;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 9px;
+    color: #757575;
+    font-weight: 600;
+  }
+  .legend-dot {
+    width: 8px; height: 8px;
+    border-radius: 2px;
+  }
+
+  /* ── MACRO DONUT ── */
+  .macro-section {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .donut-wrapper {
+    position: relative;
+    width: 90px;
+    height: 90px;
+    flex-shrink: 0;
+  }
+  .donut-wrapper svg { width: 90px; height: 90px; transform: rotate(-90deg); }
+  .donut-center {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+  }
+  .donut-center .dc-val {
+    font-size: 13px;
+    font-weight: 800;
+    color: #212121;
+    line-height: 1.1;
+  }
+  .donut-center .dc-sub {
+    font-size: 8px;
+    color: #9e9e9e;
+    font-weight: 500;
+  }
+  .macro-legend {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+  }
+  .macro-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .macro-color {
+    width: 10px; height: 10px;
+    border-radius: 3px;
+    flex-shrink: 0;
+  }
+  .macro-name {
+    font-size: 11px;
+    color: #424242;
+    font-weight: 600;
+    flex: 1;
+  }
+  .macro-grams {
+    font-size: 11px;
+    font-weight: 700;
+    color: #212121;
+  }
+  .macro-pct {
+    font-size: 10px;
+    color: #9e9e9e;
+    width: 28px;
+    text-align: right;
+  }
+  .macro-bar-bg {
+    height: 3px;
+    background: #F5F5F5;
+    border-radius: 2px;
+    margin-top: 2px;
+    overflow: hidden;
+  }
+  .macro-bar-fill { height: 100%; border-radius: 2px; }
+
+  /* ── BOTTOM NAV ── */
+  .bottom-nav {
+    background: white;
+    border-top: 1px solid #EEEEEE;
+    display: flex;
+    padding: 6px 0 10px;
+    flex-shrink: 0;
+  }
+  .nav-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    cursor: pointer;
+  }
+  .nav-icon { font-size: 18px; line-height: 1; }
+  .nav-label {
+    font-size: 9px;
+    font-weight: 600;
+    color: #9e9e9e;
+  }
+  .nav-item.active .nav-label { color: #1B5E20; }
+  .nav-item.active .nav-icon { filter: none; }
+
+  /* avg pill */
+  .avg-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: #E8F5E9;
+    border-radius: 20px;
+    padding: 3px 10px;
+    font-size: 10px;
+    font-weight: 700;
+    color: #1B5E20;
+    margin-top: 4px;
+  }
+</style>
+</head>
+<body>
+
+<!-- ════════════════════════════════════════
+     PHONE 1  —  7-DAY VIEW (DEFAULT)
+════════════════════════════════════════ -->
+<div class="phone-wrapper">
+  <div class="phone-label">Statistics — 7 Days (Default)</div>
+  <div class="phone">
+
+    <!-- Status bar -->
+    <div class="status-bar">
+      <span>7:55</span>
+      <div class="notch"></div>
+      <span>📶 🔋</span>
+    </div>
+
+    <!-- App header -->
+    <div class="app-header">
+      <h1>Statistics</h1>
+      <div class="period-toggle">
+        <button class="period-btn active">7D</button>
+        <button class="period-btn">14D</button>
+        <button class="period-btn">30D</button>
+      </div>
+    </div>
+
+    <!-- Scrollable content -->
+    <div class="screen-content">
+
+      <!-- ── STREAK + DAYS ON TARGET ── -->
+      <div class="stats-row">
+
+        <!-- Streak -->
+        <div class="mini-card">
+          <div class="emoji">🔥</div>
+          <div class="big-val">5</div>
+          <div class="sub">Day streak</div>
+          <div class="sub" style="color:#388E3C; font-weight:700; font-size:9px; margin-top:1px;">Personal best: 5</div>
+        </div>
+
+        <!-- Days on target -->
+        <div class="mini-card">
+          <div class="emoji">🎯</div>
+          <div class="big-val" style="font-size:20px; margin-top:2px;">5<span style="font-size:13px;color:#9e9e9e">/7</span></div>
+          <div class="sub">Days on target</div>
+          <div class="dot-row">
+            <div class="dot hit"></div>
+            <div class="dot hit"></div>
+            <div class="dot miss"></div>
+            <div class="dot hit"></div>
+            <div class="dot hit"></div>
+            <div class="dot hit"></div>
+            <div class="dot" style="opacity:0.35"></div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ── CALORIE BAR CHART ── -->
+      <div class="card">
+        <div class="card-title">Daily Calories</div>
+
+        <div style="position:relative;">
+          <!-- chart -->
+          <div class="chart-area" id="chart7">
+
+            <!-- Day bars — rendered via JS below -->
+
+          </div>
+
+          <!-- target line at ~63% from bottom (2178 kcal out of max ~2800) -->
+          <div class="target-line-container" style="top:0;bottom:0;left:0;right:0;position:absolute;pointer-events:none;">
+            <div class="target-line" style="bottom: 42%; ">
+              <span class="target-line-label">2178</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="chart-legend">
+          <div class="legend-item"><div class="legend-dot" style="background:#388E3C"></div>On target</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#FF9800"></div>Slightly over</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#E53935"></div>Over goal</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#90CAF9"></div>Under</div>
+        </div>
+
+        <div style="text-align:center; margin-top:6px;">
+          <span class="avg-pill">⌀ Avg: 2,024 kcal/day</span>
+        </div>
+      </div>
+
+      <!-- ── MACRO DONUT ── -->
+      <div class="card">
+        <div class="card-title">Average Macro Split · 7 Days</div>
+        <div class="macro-section">
+
+          <!-- Donut SVG -->
+          <div class="donut-wrapper">
+            <svg viewBox="0 0 36 36">
+              <circle cx="18" cy="18" r="15.9" fill="none" stroke="#F5F5F5" stroke-width="4"/>
+              <!-- Protein: 28% = 28% of circumference (100.5) = 28.14 -->
+              <circle cx="18" cy="18" r="15.9" fill="none" stroke="#1565C0" stroke-width="4"
+                      stroke-dasharray="28 72" stroke-dashoffset="0"/>
+              <!-- Carbs: 48% — offset by 28 -->
+              <circle cx="18" cy="18" r="15.9" fill="none" stroke="#FF8F00" stroke-width="4"
+                      stroke-dasharray="48 52" stroke-dashoffset="-28"/>
+              <!-- Fat: 24% — offset by 76 -->
+              <circle cx="18" cy="18" r="15.9" fill="none" stroke="#E53935" stroke-width="4"
+                      stroke-dasharray="24 76" stroke-dashoffset="-76"/>
+            </svg>
+            <div class="donut-center">
+              <div class="dc-val">2,024</div>
+              <div class="dc-sub">avg kcal</div>
+            </div>
+          </div>
+
+          <!-- Legend -->
+          <div class="macro-legend">
+
+            <div>
+              <div class="macro-row">
+                <div class="macro-color" style="background:#1565C0"></div>
+                <div class="macro-name">Protein</div>
+                <div class="macro-grams">68g</div>
+                <div class="macro-pct">28%</div>
+              </div>
+              <div class="macro-bar-bg"><div class="macro-bar-fill" style="width:28%;background:#1565C0"></div></div>
+            </div>
+
+            <div>
+              <div class="macro-row">
+                <div class="macro-color" style="background:#FF8F00"></div>
+                <div class="macro-name">Carbs</div>
+                <div class="macro-grams">121g</div>
+                <div class="macro-pct">48%</div>
+              </div>
+              <div class="macro-bar-bg"><div class="macro-bar-fill" style="width:48%;background:#FF8F00"></div></div>
+            </div>
+
+            <div>
+              <div class="macro-row">
+                <div class="macro-color" style="background:#E53935"></div>
+                <div class="macro-name">Fat</div>
+                <div class="macro-grams">54g</div>
+                <div class="macro-pct">24%</div>
+              </div>
+              <div class="macro-bar-bg"><div class="macro-bar-fill" style="width:24%;background:#E53935"></div></div>
+            </div>
+
+            <div style="border-top:1px solid #F5F5F5;padding-top:6px;margin-top:2px;">
+              <div style="font-size:9px;color:#9e9e9e;font-weight:600;">TARGET SPLIT</div>
+              <div style="font-size:9px;color:#424242;margin-top:2px;">
+                P <b>30%</b> · C <b>45%</b> · F <b>25%</b>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /screen-content -->
+
+    <!-- Bottom nav — Stats active -->
+    <div class="bottom-nav">
+      <div class="nav-item">
+        <div class="nav-icon">🏠</div>
+        <div class="nav-label">Dashboard</div>
+      </div>
+      <div class="nav-item active">
+        <div class="nav-icon">📊</div>
+        <div class="nav-label" style="color:#1B5E20">Statistics</div>
+      </div>
+      <div class="nav-item">
+        <div class="nav-icon">⚖️</div>
+        <div class="nav-label">Weight</div>
+      </div>
+      <div class="nav-item">
+        <div class="nav-icon">👤</div>
+        <div class="nav-label">Profile</div>
+      </div>
+    </div>
+
+  </div><!-- /phone -->
+</div>
+
+
+<!-- ════════════════════════════════════════
+     PHONE 2  —  30-DAY VIEW
+════════════════════════════════════════ -->
+<div class="phone-wrapper">
+  <div class="phone-label">Statistics — 30 Days View</div>
+  <div class="phone">
+
+    <div class="status-bar">
+      <span>7:55</span>
+      <div class="notch"></div>
+      <span>📶 🔋</span>
+    </div>
+
+    <div class="app-header">
+      <h1>Statistics</h1>
+      <div class="period-toggle">
+        <button class="period-btn">7D</button>
+        <button class="period-btn">14D</button>
+        <button class="period-btn active">30D</button>
+      </div>
+    </div>
+
+    <div class="screen-content">
+
+      <div class="stats-row">
+        <div class="mini-card">
+          <div class="emoji">🔥</div>
+          <div class="big-val">5</div>
+          <div class="sub">Day streak</div>
+          <div class="sub" style="color:#388E3C;font-weight:700;font-size:9px;margin-top:1px;">Best: 12 days</div>
+        </div>
+        <div class="mini-card">
+          <div class="emoji">🎯</div>
+          <div class="big-val" style="font-size:20px;margin-top:2px;">21<span style="font-size:13px;color:#9e9e9e">/30</span></div>
+          <div class="sub">Days on target</div>
+          <div style="margin-top:4px;">
+            <div style="height:6px;background:#F5F5F5;border-radius:3px;overflow:hidden;width:100%">
+              <div style="height:100%;width:70%;background:#388E3C;border-radius:3px;"></div>
+            </div>
+            <div style="font-size:9px;color:#388E3C;font-weight:700;text-align:center;margin-top:3px;">70% on target</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 30-day condensed bar chart -->
+      <div class="card">
+        <div class="card-title">Daily Calories · Last 30 Days</div>
+        <div id="chart30" style="display:flex;align-items:flex-end;gap:2px;height:80px;position:relative;padding-top:10px;margin-bottom:4px;"></div>
+        <div class="chart-legend">
+          <div class="legend-item"><div class="legend-dot" style="background:#388E3C"></div>On target</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#FF9800"></div>Slightly over</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#E53935"></div>Over goal</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#90CAF9"></div>Under</div>
+        </div>
+        <div style="text-align:center;margin-top:6px;">
+          <span class="avg-pill">⌀ Avg: 2,105 kcal/day</span>
+        </div>
+      </div>
+
+      <!-- Macro donut -->
+      <div class="card">
+        <div class="card-title">Average Macro Split · 30 Days</div>
+        <div class="macro-section">
+          <div class="donut-wrapper">
+            <svg viewBox="0 0 36 36">
+              <circle cx="18" cy="18" r="15.9" fill="none" stroke="#F5F5F5" stroke-width="4"/>
+              <circle cx="18" cy="18" r="15.9" fill="none" stroke="#1565C0" stroke-width="4"
+                      stroke-dasharray="25 75" stroke-dashoffset="0"/>
+              <circle cx="18" cy="18" r="15.9" fill="none" stroke="#FF8F00" stroke-width="4"
+                      stroke-dasharray="51 49" stroke-dashoffset="-25"/>
+              <circle cx="18" cy="18" r="15.9" fill="none" stroke="#E53935" stroke-width="4"
+                      stroke-dasharray="24 76" stroke-dashoffset="-76"/>
+            </svg>
+            <div class="donut-center">
+              <div class="dc-val">2,105</div>
+              <div class="dc-sub">avg kcal</div>
+            </div>
+          </div>
+          <div class="macro-legend">
+            <div>
+              <div class="macro-row">
+                <div class="macro-color" style="background:#1565C0"></div>
+                <div class="macro-name">Protein</div>
+                <div class="macro-grams">62g</div>
+                <div class="macro-pct">25%</div>
+              </div>
+              <div class="macro-bar-bg"><div class="macro-bar-fill" style="width:25%;background:#1565C0"></div></div>
+            </div>
+            <div>
+              <div class="macro-row">
+                <div class="macro-color" style="background:#FF8F00"></div>
+                <div class="macro-name">Carbs</div>
+                <div class="macro-grams">134g</div>
+                <div class="macro-pct">51%</div>
+              </div>
+              <div class="macro-bar-bg"><div class="macro-bar-fill" style="width:51%;background:#FF8F00"></div></div>
+            </div>
+            <div>
+              <div class="macro-row">
+                <div class="macro-color" style="background:#E53935"></div>
+                <div class="macro-name">Fat</div>
+                <div class="macro-grams">56g</div>
+                <div class="macro-pct">24%</div>
+              </div>
+              <div class="macro-bar-bg"><div class="macro-bar-fill" style="width:24%;background:#E53935"></div></div>
+            </div>
+            <div style="border-top:1px solid #F5F5F5;padding-top:6px;margin-top:2px;">
+              <div style="font-size:9px;color:#9e9e9e;font-weight:600;">TARGET SPLIT</div>
+              <div style="font-size:9px;color:#424242;margin-top:2px;">P <b>30%</b> · C <b>45%</b> · F <b>25%</b></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="bottom-nav">
+      <div class="nav-item"><div class="nav-icon">🏠</div><div class="nav-label">Dashboard</div></div>
+      <div class="nav-item active"><div class="nav-icon">📊</div><div class="nav-label" style="color:#1B5E20">Statistics</div></div>
+      <div class="nav-item"><div class="nav-icon">⚖️</div><div class="nav-label">Weight</div></div>
+      <div class="nav-item"><div class="nav-icon">👤</div><div class="nav-label">Profile</div></div>
+    </div>
+
+  </div>
+</div>
+
+
+<script>
+// ── 7-DAY BAR CHART ──────────────────────────────────────
+const target = 2178;
+const days7 = [
+  { label: 'Mon', val: 1920 },
+  { label: 'Tue', val: 2310 },
+  { label: 'Wed', val: 2180 },
+  { label: 'Thu', val: 0    }, // not logged
+  { label: 'Fri', val: 1850 },
+  { label: 'Sat', val: 2650 },
+  { label: 'Sun', val: 2100 },
+];
+
+function barColor(val, tgt) {
+  if (val === 0) return '#E0E0E0';
+  const ratio = val / tgt;
+  if (ratio <= 1.02) return '#388E3C';      // on target (±2%)
+  if (ratio <= 1.10) return '#FF9800';      // slightly over
+  if (ratio > 1.10)  return '#E53935';      // over
+  return '#90CAF9';                         // under (already caught by <=1.02)
+}
+function barColorUnder(val, tgt) {
+  if (val === 0) return '#E0E0E0';
+  const ratio = val / tgt;
+  if (ratio < 0.85) return '#90CAF9';
+  if (ratio <= 1.02) return '#388E3C';
+  if (ratio <= 1.10) return '#FF9800';
+  return '#E53935';
+}
+
+const maxVal7 = Math.max(...days7.map(d => d.val), target * 1.15);
+const chart7el = document.getElementById('chart7');
+
+days7.forEach(d => {
+  const heightPct = d.val > 0 ? (d.val / maxVal7) * 100 : 4;
+  const color = barColorUnder(d.val, target);
+  const valLabel = d.val > 0 ? (d.val >= 1000 ? (d.val/1000).toFixed(1)+'k' : d.val) : '—';
+
+  chart7el.innerHTML += `
+    <div class="bar-group" style="height:100%;">
+      <div class="bar-outer" style="height:94%;">
+        <div class="bar-fill" style="height:${heightPct}%;background:${color};">
+          <span class="bar-val">${valLabel}</span>
+        </div>
+      </div>
+      <span class="bar-label">${d.label}</span>
+    </div>`;
+});
+
+// target line position
+const targetPct = (target / maxVal7) * 94;
+const lineEl = document.querySelector('.target-line');
+if (lineEl) lineEl.style.bottom = targetPct + '%';
+
+// ── 30-DAY BAR CHART ────────────────────────────────────
+const days30 = [];
+const labels30 = [];
+for (let i = 30; i >= 1; i--) {
+  const base = 1800 + Math.random() * 800;
+  const logged = Math.random() > 0.12; // ~88% logging rate
+  days30.push(logged ? Math.round(base) : 0);
+}
+
+const maxVal30 = Math.max(...days30, target * 1.15);
+const chart30el = document.getElementById('chart30');
+
+days30.forEach((val, i) => {
+  const heightPct = val > 0 ? (val / maxVal30) * 86 : 3;
+  const color = barColorUnder(val, target);
+  chart30el.innerHTML += `
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;height:100%;justify-content:flex-end;">
+      <div style="width:100%;background:#F5F5F5;border-radius:3px 3px 0 0;height:88%;display:flex;align-items:flex-end;overflow:hidden;">
+        <div style="width:100%;height:${heightPct}%;background:${color};border-radius:3px 3px 0 0;"></div>
+      </div>
+    </div>`;
+});
+
+// target line for 30d
+const targetPct30 = (target / maxVal30) * 88;
+chart30el.style.position = 'relative';
+const tl30 = document.createElement('div');
+tl30.style.cssText = `position:absolute;left:0;right:0;bottom:calc(${targetPct30}% + 6px);border-top:1px dashed #E53935;pointer-events:none;`;
+chart30el.appendChild(tl30);
+</script>
+</body>
+</html>

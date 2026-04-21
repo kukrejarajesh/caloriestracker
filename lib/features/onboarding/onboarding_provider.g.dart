@@ -7,11 +7,11 @@ part of 'onboarding_provider.dart';
 // **************************************************************************
 
 String _$onboardingCompleteHash() =>
-    r'2bf5039f319905dc46126cb7c9d594a449f8c318';
+    r'a200ae2e62ba047fad7863812936729b1ca6d8b1';
 
 /// See also [onboardingComplete].
 @ProviderFor(onboardingComplete)
-final onboardingCompleteProvider = AutoDisposeFutureProvider<bool>.internal(
+final onboardingCompleteProvider = AutoDisposeStreamProvider<bool>.internal(
   onboardingComplete,
   name: r'onboardingCompleteProvider',
   debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
@@ -23,9 +23,9 @@ final onboardingCompleteProvider = AutoDisposeFutureProvider<bool>.internal(
 
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
-typedef OnboardingCompleteRef = AutoDisposeFutureProviderRef<bool>;
+typedef OnboardingCompleteRef = AutoDisposeStreamProviderRef<bool>;
 String _$onboardingNotifierHash() =>
-    r'67cfc95dfd5960c5c47799e1262d80152050fc1d';
+    r'66e9ba5e5ae88278052b8625e5661ef479e102fe';
 
 /// See also [OnboardingNotifier].
 @ProviderFor(OnboardingNotifier)

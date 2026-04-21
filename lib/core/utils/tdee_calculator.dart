@@ -13,6 +13,7 @@ class TdeeCalculator {
     'lightly_active': 1.375,
     'moderately_active': 1.55,
     'very_active': 1.725,
+    'extra_active': 1.9,
   };
 
   // ── Core calculations ────────────────────────────────────────────────────
@@ -69,6 +70,59 @@ class TdeeCalculator {
       default:
         return tdeeValue;
     }
+  }
+
+  // ── Personalised calorie target ──────────────────────────────────────────
+
+  /// Personalised daily calorie target driven by a weekly pace of change.
+  ///
+  /// Formula:
+  ///   daily_change = paceKgPerWeek × 7700 / 7  (capped at 1000 kcal/day)
+  ///   lose: target = TDEE − daily_change  → clamped to safety minimum
+  ///   gain: target = TDEE + daily_change  → clamped to TDEE + 500 max
+  ///   maintain: TDEE unchanged
+  ///
+  /// Safety minimums: 1500 kcal/day (male) / 1200 kcal/day (female).
+  static double personalizedCalorieTarget({
+    required double tdeeValue,
+    required String goalType,
+    required double paceKgPerWeek,
+    required String gender,
+  }) {
+    if (goalType == 'maintain') return tdeeValue;
+    final dailyChange = (paceKgPerWeek * 7700 / 7).clamp(0.0, 1000.0);
+    final minKcal = gender == 'female' ? 1200.0 : 1500.0;
+    if (goalType == 'lose') {
+      return (tdeeValue - dailyChange).clamp(minKcal, double.infinity);
+    } else {
+      // gain
+      return (tdeeValue + dailyChange).clamp(0.0, tdeeValue + 500);
+    }
+  }
+
+  /// Returns true if [paceKgPerWeek] would push the daily target below the
+  /// safe minimum for this gender/TDEE combination.
+  static bool isPaceUnsafe({
+    required double tdeeValue,
+    required String gender,
+    required double paceKgPerWeek,
+  }) {
+    final dailyChange = paceKgPerWeek * 7700 / 7;
+    final minKcal = gender == 'female' ? 1200.0 : 1500.0;
+    return (tdeeValue - dailyChange) < minKcal;
+  }
+
+  /// Estimated whole weeks to reach [targetWeightKg] from [currentWeightKg]
+  /// at [paceKgPerWeek]. Returns null if pace is zero or inputs are invalid.
+  static int? weeksToGoal({
+    required double currentWeightKg,
+    required double targetWeightKg,
+    required double paceKgPerWeek,
+  }) {
+    if (paceKgPerWeek <= 0) return null;
+    final diff = (currentWeightKg - targetWeightKg).abs();
+    if (diff == 0) return 0;
+    return (diff / paceKgPerWeek).ceil();
   }
 
   // ── Macro splits ──────────────────────────────────────────────────────────

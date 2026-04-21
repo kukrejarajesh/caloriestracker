@@ -22,6 +22,8 @@ class UserProfile extends Table {
   RealColumn get proteinTargetG => real().nullable()();
   RealColumn get carbsTargetG => real().nullable()();
   RealColumn get fatTargetG => real().nullable()();
+  RealColumn get targetWeightKg => real().nullable()();
+  RealColumn get paceKgPerWeek  => real().withDefault(const Constant(0.5))();
   IntColumn get waterTargetMl => integer().withDefault(const Constant(2000))();
   IntColumn get isGlutenFree => integer().withDefault(const Constant(1))();
   IntColumn get dbVersion => integer().withDefault(const Constant(1))();

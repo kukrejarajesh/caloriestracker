@@ -2,8 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/app_colors.dart';
-import '../../widgets/gluten_badge.dart';
+import '../../core/utils/tdee_calculator.dart';
 import 'onboarding_provider.dart';
+
+String _formatDob(String iso) {
+  final dt = DateTime.parse(iso);
+  const months = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
+  return '${months[dt.month - 1]} ${dt.day}, ${dt.year}';
+}
 
 class OnboardingScreen extends ConsumerStatefulWidget {
   const OnboardingScreen({super.key});
@@ -85,12 +94,15 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       );
       return;
     }
-    final ok =
-        await ref.read(onboardingNotifierProvider.notifier).saveProfile();
-    if (ok && mounted) {
-      // Invalidate the provider so _AppRouter re-evaluates and routes to _MainShell
-      ref.invalidate(onboardingCompleteProvider);
+    // Require target weight for lose/gain goals
+    if (state.goalType != 'maintain' && state.targetWeightKg == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter your target weight.')),
+      );
+      return;
     }
+    await ref.read(onboardingNotifierProvider.notifier).saveProfile();
+    // StreamProvider reacts automatically to DB change — no invalidate needed.
   }
 
   @override
@@ -298,6 +310,11 @@ class _Page1Personal extends ConsumerWidget {
               selected: state.gender,
               onSelected: notifier.setGender,
             ),
+            _TipCard(
+              icon: Icons.info_outline,
+              text:
+                  'Your personal info helps us calculate your Basal Metabolic Rate (BMR) — the calories your body burns at rest.',
+            ),
           ],
         ),
       ),
@@ -374,6 +391,11 @@ class _Page2Body extends ConsumerWidget {
                 return null;
               },
             ),
+            _TipCard(
+              icon: Icons.calculate_outlined,
+              text:
+                  'We use height and weight to estimate your daily calorie needs using the Mifflin-St Jeor formula.',
+            ),
           ],
         ),
       ),
@@ -391,6 +413,7 @@ class _Page3Activity extends ConsumerWidget {
     ('lightly_active', 'Lightly Active', 'Light exercise 1–3 days/week'),
     ('moderately_active', 'Moderately Active', 'Moderate exercise 3–5 days/week'),
     ('very_active', 'Very Active', 'Hard exercise 6–7 days/week'),
+    ('extra_active', 'Extra Active', 'Hard exercise every day or physical job'),
   ];
 
   @override
@@ -472,10 +495,17 @@ class _Page3Activity extends ConsumerWidget {
   }
 }
 
-// ── Page 4 — Goal + Gluten ────────────────────────────────────────────────────
+// ── Page 4 — Goal + Target Weight + Pace ─────────────────────────────────────
 
-class _Page4Goal extends ConsumerWidget {
+class _Page4Goal extends ConsumerStatefulWidget {
   const _Page4Goal();
+
+  @override
+  ConsumerState<_Page4Goal> createState() => _Page4GoalState();
+}
+
+class _Page4GoalState extends ConsumerState<_Page4Goal> {
+  final _targetWeightCtrl = TextEditingController();
 
   static const _goals = [
     ('lose', 'Lose Weight', Icons.trending_down),
@@ -483,10 +513,45 @@ class _Page4Goal extends ConsumerWidget {
     ('gain', 'Gain Weight', Icons.trending_up),
   ];
 
+  static const _paces = [
+    (0.25, 'Gradual', '0.25 kg/week'),
+    (0.5, 'Moderate', '0.5 kg/week'),
+    (0.75, 'Active', '0.75 kg/week'),
+    (1.0, 'Aggressive', '1 kg/week'),
+  ];
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  void dispose() {
+    _targetWeightCtrl.dispose();
+    super.dispose();
+  }
+
+  /// Compute TDEE from current onboarding state (may return null if inputs missing).
+  double? _tdee(OnboardingFormState s) {
+    if (s.weightKg == null ||
+        s.heightCm == null ||
+        s.dateOfBirth == null ||
+        s.gender == null ||
+        s.activityLevel == null) {
+      return null;
+    }
+    final age = TdeeCalculator.ageFromDob(s.dateOfBirth!);
+    final bmr = TdeeCalculator.bmr(
+      weightKg: s.weightKg!,
+      heightCm: s.heightCm!,
+      ageYears: age,
+      gender: s.gender!,
+    );
+    return TdeeCalculator.tdee(bmr: bmr, activityLevel: s.activityLevel!);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final notifier = ref.read(onboardingNotifierProvider.notifier);
     final state = ref.watch(onboardingNotifierProvider);
+    final showGoalDetails =
+        state.goalType == 'lose' || state.goalType == 'gain';
+    final tdeeVal = _tdee(state);
 
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
@@ -495,16 +560,23 @@ class _Page4Goal extends ConsumerWidget {
         children: [
           Text('Your Goal', style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 6),
-          Text('We\'ll set your daily calorie target accordingly.',
+          Text("We'll set your daily calorie target accordingly.",
               style: Theme.of(context).textTheme.bodyMedium),
           const SizedBox(height: 24),
 
-          // Goal selector
+          // ── Goal type selector ───────────────────────────────────────
           ..._goals.map((g) {
             final (value, label, icon) = g;
             final isSelected = state.goalType == value;
             return GestureDetector(
-              onTap: () => notifier.setGoalType(value),
+              onTap: () {
+                notifier.setGoalType(value);
+                // Clear target weight when switching to maintain
+                if (value == 'maintain') {
+                  notifier.setTargetWeightKg(null);
+                  _targetWeightCtrl.clear();
+                }
+              },
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
                 margin: const EdgeInsets.only(bottom: 12),
@@ -534,8 +606,7 @@ class _Page4Goal extends ConsumerWidget {
                           .textTheme
                           .titleMedium
                           ?.copyWith(
-                            color:
-                                isSelected ? AppColors.primary : null,
+                            color: isSelected ? AppColors.primary : null,
                           ),
                     ),
                   ],
@@ -544,40 +615,143 @@ class _Page4Goal extends ConsumerWidget {
             );
           }),
 
-          const SizedBox(height: 24),
-          const Divider(),
-          const SizedBox(height: 16),
-
-          // Gluten-free toggle
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Gluten-Free Diet',
-                        style: Theme.of(context).textTheme.titleMedium),
-                    const SizedBox(height: 4),
-                    GlutenBadge(
-                      glutenStatus: state.isGlutenFree
-                          ? 'gluten_free'
-                          : 'unknown',
-                    ),
-                  ],
-                ),
-              ),
-              Switch(
-                value: state.isGlutenFree,
-                activeThumbColor: AppColors.glutenSafeLight,
-                onChanged: notifier.setIsGlutenFree,
-              ),
+          // ── Target weight + pace (only for lose/gain) ───────────────
+          if (showGoalDetails) ...[
+            const SizedBox(height: 8),
+            Text('Target Weight',
+                style: Theme.of(context)
+                    .textTheme
+                    .titleMedium
+                    ?.copyWith(color: AppColors.primary)),
+            const SizedBox(height: 8),
+            TextFormField(
+              controller: _targetWeightCtrl,
+              decoration: const InputDecoration(
+                  labelText: 'Target weight', suffixText: 'kg'),
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+              onChanged: (v) {
+                final d = double.tryParse(v);
+                notifier.setTargetWeightKg(d);
+              },
+            ),
+            // Inline validation hint
+            if (state.targetWeightKg != null && state.weightKg != null) ...[
+              const SizedBox(height: 4),
+              Builder(builder: (context) {
+                final valid = state.goalType == 'lose'
+                    ? state.targetWeightKg! < state.weightKg!
+                    : state.targetWeightKg! > state.weightKg!;
+                if (!valid) {
+                  final msg = state.goalType == 'lose'
+                      ? 'Target weight must be less than your current weight'
+                      : 'Target weight must be greater than your current weight';
+                  return Text(msg,
+                      style: TextStyle(
+                          color: Theme.of(context).colorScheme.error,
+                          fontSize: 12));
+                }
+                return const SizedBox.shrink();
+              }),
             ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'When ON, food search will only show gluten-free items by default.',
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
+            const SizedBox(height: 20),
+
+            Text('Weekly Pace',
+                style: Theme.of(context)
+                    .textTheme
+                    .titleMedium
+                    ?.copyWith(color: AppColors.primary)),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: _paces.map((p) {
+                final (paceVal, label, sublabel) = p;
+                final isSelected = state.paceKgPerWeek == paceVal;
+                final isUnsafe = tdeeVal != null &&
+                    state.goalType == 'lose' &&
+                    TdeeCalculator.isPaceUnsafe(
+                      tdeeValue: tdeeVal,
+                      gender: state.gender ?? 'male',
+                      paceKgPerWeek: paceVal,
+                    );
+                return Tooltip(
+                  message: isUnsafe
+                      ? 'Not available for your current goal. Choose a smaller target or slower pace.'
+                      : '',
+                  child: ChoiceChip(
+                    label: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(label),
+                        Text(sublabel,
+                            style: const TextStyle(fontSize: 10)),
+                      ],
+                    ),
+                    selected: isSelected,
+                    selectedColor: AppColors.primary,
+                    disabledColor:
+                        Theme.of(context).disabledColor.withValues(alpha: 0.1),
+                    labelStyle: TextStyle(
+                      color: isUnsafe
+                          ? Theme.of(context).disabledColor
+                          : isSelected
+                              ? Colors.white
+                              : null,
+                      fontWeight: isSelected
+                          ? FontWeight.w600
+                          : FontWeight.normal,
+                    ),
+                    onSelected: isUnsafe
+                        ? null
+                        : (_) => notifier.setPaceKgPerWeek(paceVal),
+                  ),
+                );
+              }).toList(),
+            ),
+
+            // ── Live timeline preview ─────────────────────────────────
+            if (state.targetWeightKg != null &&
+                state.weightKg != null) ...[
+              const SizedBox(height: 16),
+              Builder(builder: (context) {
+                final validTarget = state.goalType == 'lose'
+                    ? state.targetWeightKg! < state.weightKg!
+                    : state.targetWeightKg! > state.weightKg!;
+                if (!validTarget) return const SizedBox.shrink();
+                final weeks = TdeeCalculator.weeksToGoal(
+                  currentWeightKg: state.weightKg!,
+                  targetWeightKg: state.targetWeightKg!,
+                  paceKgPerWeek: state.paceKgPerWeek,
+                );
+                if (weeks == null) return const SizedBox.shrink();
+                return Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                        color: AppColors.primary.withValues(alpha: 0.2)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.schedule_outlined,
+                          size: 16, color: AppColors.primary),
+                      const SizedBox(width: 8),
+                      Text(
+                        '~$weeks weeks at this pace',
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodyMedium
+                            ?.copyWith(color: AppColors.primary),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+            ],
+          ],
         ],
       ),
     );
@@ -618,13 +792,42 @@ class _DatePickerField extends StatelessWidget {
           suffixIcon: const Icon(Icons.calendar_today_outlined, size: 18),
         ),
         child: Text(
-          selected ?? 'Select date',
+          selected != null ? _formatDob(selected!) : 'Select date',
           style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                 color: selected == null
                     ? Theme.of(context).hintColor
                     : null,
               ),
         ),
+      ),
+    );
+  }
+}
+
+class _TipCard extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  const _TipCard({required this.icon, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(top: 28),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: AppColors.primary, size: 20),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(text, style: Theme.of(context).textTheme.bodyMedium),
+          ),
+        ],
       ),
     );
   }

@@ -23,7 +23,7 @@ final todayProvider = AutoDisposeProvider<String>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef TodayRef = AutoDisposeProviderRef<String>;
-String _$dashboardHash() => r'787e03b159fdd78d613e2eebf1e8da29f6579683';
+String _$dashboardHash() => r'6be2760e9d8ab8af22b282bb6f1de5e1a76fb5a0';
 
 /// See also [dashboard].
 @ProviderFor(dashboard)
@@ -40,7 +40,7 @@ final dashboardProvider = AutoDisposeStreamProvider<DashboardData>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef DashboardRef = AutoDisposeStreamProviderRef<DashboardData>;
-String _$todayWaterMlHash() => r'743067775d5babef6e1a23c3019dc97d3cc8ddbc';
+String _$todayWaterMlHash() => r'8590a68f3b91e75a2c7f1fdc311af87cd0ca7421';
 
 /// See also [todayWaterMl].
 @ProviderFor(todayWaterMl)
@@ -57,5 +57,22 @@ final todayWaterMlProvider = AutoDisposeStreamProvider<int>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef TodayWaterMlRef = AutoDisposeStreamProviderRef<int>;
+String _$dashboardDateNotifierHash() =>
+    r'aadcdcd17e7e0b144bfe0b34463c6d1919b3e501';
+
+/// See also [DashboardDateNotifier].
+@ProviderFor(DashboardDateNotifier)
+final dashboardDateNotifierProvider =
+    AutoDisposeNotifierProvider<DashboardDateNotifier, String>.internal(
+      DashboardDateNotifier.new,
+      name: r'dashboardDateNotifierProvider',
+      debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+          ? null
+          : _$dashboardDateNotifierHash,
+      dependencies: null,
+      allTransitiveDependencies: null,
+    );
+
+typedef _$DashboardDateNotifier = AutoDisposeNotifier<String>;
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package

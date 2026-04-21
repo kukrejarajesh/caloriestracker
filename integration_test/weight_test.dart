@@ -80,7 +80,7 @@ void main() {
         await tester.pump(const Duration(milliseconds: 500));
         await tester.pump(const Duration(milliseconds: 500));
 
-        expect(find.textContaining('Last 2 entries'), findsOneWidget);
+        expect(find.textContaining('Weight Log'), findsOneWidget);
         expect(find.byType(LineChart), findsOneWidget);
       },
       timeout: const Timeout(Duration(seconds: 30)),

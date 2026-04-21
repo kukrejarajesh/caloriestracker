@@ -38,5 +38,12 @@ void main() {
     // streams never complete.
     expect(find.byType(MaterialApp), findsOneWidget);
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
+
+    // Explicitly dispose the ProviderScope INSIDE the test body so we can
+    // drain the zero-duration timer that Drift's StreamQueryStore schedules
+    // in markAsClosed(). Without this pump the framework sees a pending timer
+    // after the widget tree is torn down and fails the invariant check.
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(Duration.zero);
   });
 }

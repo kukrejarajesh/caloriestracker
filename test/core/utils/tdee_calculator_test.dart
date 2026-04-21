@@ -112,6 +112,20 @@ void main() {
           closeTo(2587.5, 0.01));
     });
 
+    test('extra_active multiplier is 1.9', () {
+      expect(TdeeCalculator.tdee(bmr: testBmr, activityLevel: 'extra_active'),
+          closeTo(2850.0, 0.01));
+    });
+
+    test('extra_active produces higher TDEE than very_active', () {
+      const bmr = 1600.0;
+      final veryActive =
+          TdeeCalculator.tdee(bmr: bmr, activityLevel: 'very_active');
+      final extraActive =
+          TdeeCalculator.tdee(bmr: bmr, activityLevel: 'extra_active');
+      expect(extraActive, greaterThan(veryActive));
+    });
+
     test('TDEE is higher for active than sedentary users with the same stats', () {
       const bmr = 1600.0;
       final sedentary =
@@ -235,6 +249,188 @@ void main() {
       expect(unknown.proteinG, closeTo(maintain.proteinG, 0.001));
       expect(unknown.carbsG, closeTo(maintain.carbsG, 0.001));
       expect(unknown.fatG, closeTo(maintain.fatG, 0.001));
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // personalizedCalorieTarget — pace-based calculation
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  group('TdeeCalculator.personalizedCalorieTarget', () {
+    const tdee = 2728.0; // from spec worked example
+
+    test('spec example: lose 6 kg in 12 weeks → ~2178 kcal', () {
+      // From spec: weekly_deficit = 46200/12 = 3850; daily = 550; target = 2728-550 = 2178
+      final result = TdeeCalculator.personalizedCalorieTarget(
+        tdeeValue: tdee,
+        goalType: 'lose',
+        paceKgPerWeek: 0.5, // ~550 kcal/day deficit
+        gender: 'male',
+      );
+      // 0.5 * 7700 / 7 = 550; 2728 - 550 = 2178
+      expect(result, closeTo(2178.0, 1.0));
+    });
+
+    test('maintain returns TDEE unchanged', () {
+      final result = TdeeCalculator.personalizedCalorieTarget(
+        tdeeValue: tdee,
+        goalType: 'maintain',
+        paceKgPerWeek: 0.5,
+        gender: 'male',
+      );
+      expect(result, closeTo(tdee, 0.01));
+    });
+
+    test('lose: clamped to 1500 kcal minimum for males', () {
+      // TDEE of 1600 - (1.0 * 7700/7 = 1100) = 500 → clamp to 1500
+      final result = TdeeCalculator.personalizedCalorieTarget(
+        tdeeValue: 1600.0,
+        goalType: 'lose',
+        paceKgPerWeek: 1.0,
+        gender: 'male',
+      );
+      expect(result, closeTo(1500.0, 0.01));
+    });
+
+    test('lose: clamped to 1200 kcal minimum for females', () {
+      final result = TdeeCalculator.personalizedCalorieTarget(
+        tdeeValue: 1600.0,
+        goalType: 'lose',
+        paceKgPerWeek: 1.0,
+        gender: 'female',
+      );
+      expect(result, closeTo(1200.0, 0.01));
+    });
+
+    test('gain: surplus capped at TDEE + 500', () {
+      // TDEE 2000 + (1.0 * 7700/7 = 1100) = 3100 → clamped to 2000 + 500 = 2500
+      final result = TdeeCalculator.personalizedCalorieTarget(
+        tdeeValue: 2000.0,
+        goalType: 'gain',
+        paceKgPerWeek: 1.0,
+        gender: 'male',
+      );
+      expect(result, closeTo(2500.0, 0.01));
+    });
+
+    test('gain: within safe range adds surplus correctly', () {
+      // TDEE 2000 + (0.25 * 7700/7 = 275) = 2275
+      final result = TdeeCalculator.personalizedCalorieTarget(
+        tdeeValue: 2000.0,
+        goalType: 'gain',
+        paceKgPerWeek: 0.25,
+        gender: 'male',
+      );
+      expect(result, closeTo(2275.0, 1.0));
+    });
+
+    test('daily deficit is capped at 1000 kcal (pace > ~0.91 kg/week)', () {
+      // pace 2.0 kg/week would give 2 * 7700/7 = 2200; capped to 1000
+      // TDEE 2500 - 1000 = 1500 (for male, exactly at minimum)
+      final result = TdeeCalculator.personalizedCalorieTarget(
+        tdeeValue: 2500.0,
+        goalType: 'lose',
+        paceKgPerWeek: 2.0,
+        gender: 'male',
+      );
+      expect(result, closeTo(1500.0, 0.01));
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // isPaceUnsafe
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  group('TdeeCalculator.isPaceUnsafe', () {
+    test('safe pace (0.5 kg/wk) at TDEE 2500 is not unsafe for male', () {
+      expect(
+        TdeeCalculator.isPaceUnsafe(
+            tdeeValue: 2500, gender: 'male', paceKgPerWeek: 0.5),
+        isFalse,
+      );
+    });
+
+    test('aggressive pace (1.0 kg/wk) at TDEE 2000 is not unsafe for male', () {
+      // 2000 - 1100 = 900 < 1500 → unsafe
+      expect(
+        TdeeCalculator.isPaceUnsafe(
+            tdeeValue: 2000, gender: 'male', paceKgPerWeek: 1.0),
+        isTrue,
+      );
+    });
+
+    test('1.0 kg/wk is unsafe for female at TDEE 2000', () {
+      // 2000 - 1100 = 900 < 1200 → unsafe
+      expect(
+        TdeeCalculator.isPaceUnsafe(
+            tdeeValue: 2000, gender: 'female', paceKgPerWeek: 1.0),
+        isTrue,
+      );
+    });
+
+    test('safe pace (0.25 kg/wk) at TDEE 1800 is not unsafe for female', () {
+      // 1800 - 275 = 1525 >= 1200 → safe
+      expect(
+        TdeeCalculator.isPaceUnsafe(
+            tdeeValue: 1800, gender: 'female', paceKgPerWeek: 0.25),
+        isFalse,
+      );
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // weeksToGoal
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  group('TdeeCalculator.weeksToGoal', () {
+    test('6 kg at 0.5 kg/week = 12 weeks', () {
+      expect(
+        TdeeCalculator.weeksToGoal(
+            currentWeightKg: 86, targetWeightKg: 80, paceKgPerWeek: 0.5),
+        equals(12),
+      );
+    });
+
+    test('3 kg at 0.25 kg/week = 12 weeks', () {
+      expect(
+        TdeeCalculator.weeksToGoal(
+            currentWeightKg: 73, targetWeightKg: 70, paceKgPerWeek: 0.25),
+        equals(12),
+      );
+    });
+
+    test('non-exact division rounds up (ceil)', () {
+      // 5 kg at 0.75 kg/week = 6.67 → ceil = 7
+      expect(
+        TdeeCalculator.weeksToGoal(
+            currentWeightKg: 75, targetWeightKg: 70, paceKgPerWeek: 0.75),
+        equals(7),
+      );
+    });
+
+    test('target already reached returns 0', () {
+      expect(
+        TdeeCalculator.weeksToGoal(
+            currentWeightKg: 70, targetWeightKg: 70, paceKgPerWeek: 0.5),
+        equals(0),
+      );
+    });
+
+    test('gain direction uses absolute difference', () {
+      // gain: current 60, target 65, pace 0.5 → 5/0.5 = 10 weeks
+      expect(
+        TdeeCalculator.weeksToGoal(
+            currentWeightKg: 60, targetWeightKg: 65, paceKgPerWeek: 0.5),
+        equals(10),
+      );
+    });
+
+    test('zero pace returns null', () {
+      expect(
+        TdeeCalculator.weeksToGoal(
+            currentWeightKg: 80, targetWeightKg: 70, paceKgPerWeek: 0),
+        isNull,
+      );
     });
   });
 

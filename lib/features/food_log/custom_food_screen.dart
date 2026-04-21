@@ -71,6 +71,20 @@ class _CustomFoodScreenState extends ConsumerState<CustomFoodScreen> {
 
   bool get _isEditing => widget.existingFood != null;
 
+  /// Whether the calorie field was last set by auto-calculation.
+  bool _caloriesAutoCalculated = false;
+
+  void _recalcCalories() {
+    final p = double.tryParse(_proteinController.text.trim());
+    final c = double.tryParse(_carbsController.text.trim());
+    final f = double.tryParse(_fatController.text.trim());
+    if (p != null && c != null && f != null) {
+      final auto = (p * 4 + c * 4 + f * 9).roundToDouble();
+      _caloriesController.text = auto.toStringAsFixed(0);
+      if (mounted) setState(() => _caloriesAutoCalculated = true);
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -99,6 +113,21 @@ class _CustomFoodScreenState extends ConsumerState<CustomFoodScreen> {
 
     _category = food?.category ?? _foodCategories.first;
     _glutenStatus = food?.glutenStatus ?? 'unknown';
+
+    // Auto-calculate calories whenever any macro field changes.
+    _proteinController.addListener(_recalcCalories);
+    _carbsController.addListener(_recalcCalories);
+    _fatController.addListener(_recalcCalories);
+    // If the user manually edits calories, clear the auto flag.
+    _caloriesController.addListener(() {
+      // Only clear the flag when the user is the source of the change
+      // (i.e. the field was focused). We rely on the fact that
+      // _recalcCalories sets the text programmatically — that also fires
+      // this listener, so we gate on _caloriesAutoCalculated to avoid
+      // clearing the flag we just set.
+      if (!_caloriesAutoCalculated) return;
+      _caloriesAutoCalculated = false;
+    });
   }
 
   @override
@@ -467,10 +496,38 @@ class _CustomFoodScreenState extends ConsumerState<CustomFoodScreen> {
                 style: theme.textTheme.titleMedium),
             const SizedBox(height: 12),
 
-            _NumericField(
-              controller: _caloriesController,
-              label: 'Calories (kcal) *',
-              isRequired: true,
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Expanded(
+                  child: _NumericField(
+                    controller: _caloriesController,
+                    label: 'Calories (kcal) *',
+                    isRequired: true,
+                  ),
+                ),
+                if (_caloriesAutoCalculated) ...[
+                  const SizedBox(width: 8),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Tooltip(
+                      message: 'Calculated from Protein × 4 + Carbs × 4 + Fat × 9',
+                      child: Chip(
+                        label: const Text('Auto'),
+                        labelStyle: TextStyle(
+                          fontSize: 11,
+                          color: AppColors.primary,
+                        ),
+                        backgroundColor:
+                            AppColors.primary.withValues(alpha: 0.1),
+                        padding: EdgeInsets.zero,
+                        materialTapTargetSize:
+                            MaterialTapTargetSize.shrinkWrap,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
             ),
             const SizedBox(height: 12),
 

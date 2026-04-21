@@ -2,8 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../core/utils/tdee_calculator.dart';
 import '../../widgets/gluten_badge.dart';
 import 'profile_provider.dart';
+
+String _formatDob(String iso) {
+  final dt = DateTime.parse(iso);
+  const months = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
+  return '${months[dt.month - 1]} ${dt.day}, ${dt.year}';
+}
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -41,7 +51,15 @@ class _ProfileFormState extends ConsumerState<_ProfileForm> {
   final _heightCtrl = TextEditingController();
   final _weightCtrl = TextEditingController();
   final _waterCtrl = TextEditingController();
+  final _targetWeightCtrl = TextEditingController();
   final _formKey = GlobalKey<FormState>();
+
+  static const _paces = [
+    (0.25, 'Gradual', '0.25 kg/wk'),
+    (0.5, 'Moderate', '0.5 kg/wk'),
+    (0.75, 'Active', '0.75 kg/wk'),
+    (1.0, 'Aggressive', '1 kg/wk'),
+  ];
 
   @override
   void initState() {
@@ -55,6 +73,8 @@ class _ProfileFormState extends ConsumerState<_ProfileForm> {
       _heightCtrl.text = s.heightCm?.toStringAsFixed(1) ?? '';
       _weightCtrl.text = s.weightKg?.toStringAsFixed(1) ?? '';
       _waterCtrl.text = '${s.waterTargetMl}';
+      _targetWeightCtrl.text =
+          s.targetWeightKg?.toStringAsFixed(1) ?? '';
     });
   }
 
@@ -64,17 +84,20 @@ class _ProfileFormState extends ConsumerState<_ProfileForm> {
     _heightCtrl.dispose();
     _weightCtrl.dispose();
     _waterCtrl.dispose();
+    _targetWeightCtrl.dispose();
     super.dispose();
   }
 
   Future<void> _save() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
-    final ok =
-        await ref.read(profileEditNotifierProvider.notifier).save();
+    final notifier = ref.read(profileEditNotifierProvider.notifier);
+    final preview = notifier.previewCalorieTarget;
+    final ok = await notifier.save();
     if (ok && mounted) {
+      final kcalText = preview != null ? ' — ${preview.round()} kcal/day' : '';
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Profile saved. Targets recalculated.'),
+        SnackBar(
+          content: Text('Profile saved. Daily target$kcalText'),
           backgroundColor: AppColors.primary,
         ),
       );
@@ -85,6 +108,27 @@ class _ProfileFormState extends ConsumerState<_ProfileForm> {
   Widget build(BuildContext context) {
     final notifier = ref.read(profileEditNotifierProvider.notifier);
     final state = ref.watch(profileEditNotifierProvider);
+    final showGoalDetails =
+        state.goalType == 'lose' || state.goalType == 'gain';
+
+    // Compute TDEE for pace-safety checks
+    double? tdeeVal;
+    if (state.weightKg != null &&
+        state.heightCm != null &&
+        state.dateOfBirth != null &&
+        state.gender != null &&
+        state.activityLevel != null) {
+      final age = TdeeCalculator.ageFromDob(state.dateOfBirth!);
+      final bmr = TdeeCalculator.bmr(
+        weightKg: state.weightKg!,
+        heightCm: state.heightCm!,
+        ageYears: age,
+        gender: state.gender!,
+      );
+      tdeeVal = TdeeCalculator.tdee(bmr: bmr, activityLevel: state.activityLevel!);
+    }
+
+    final preview = notifier.previewCalorieTarget;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -166,13 +210,15 @@ class _ProfileFormState extends ConsumerState<_ProfileForm> {
                 'sedentary',
                 'lightly_active',
                 'moderately_active',
-                'very_active'
+                'very_active',
+                'extra_active'
               ],
               labels: const [
                 'Sedentary',
-                'Light',
-                'Moderate',
-                'Very Active'
+                'Lightly Active',
+                'Moderately Active',
+                'Very Active',
+                'Extra Active'
               ],
               selected: state.activityLevel,
               onSelected: notifier.setActivityLevel,
@@ -185,8 +231,117 @@ class _ProfileFormState extends ConsumerState<_ProfileForm> {
               options: const ['lose', 'maintain', 'gain'],
               labels: const ['Lose', 'Maintain', 'Gain'],
               selected: state.goalType,
-              onSelected: notifier.setGoalType,
+              onSelected: (v) {
+                notifier.setGoalType(v);
+                if (v == 'maintain') {
+                  notifier.setTargetWeightKg(null);
+                  _targetWeightCtrl.clear();
+                }
+              },
             ),
+
+            // ── Goal Details (lose / gain only) ────────────────────────
+            if (showGoalDetails) ...[
+              const SizedBox(height: 16),
+              Text('Target Weight',
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodyMedium
+                      ?.copyWith(fontWeight: FontWeight.w600)),
+              const SizedBox(height: 8),
+              TextFormField(
+                controller: _targetWeightCtrl,
+                decoration: const InputDecoration(
+                    labelText: 'Target weight', suffixText: 'kg'),
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                onChanged: (v) {
+                  final d = double.tryParse(v);
+                  notifier.setTargetWeightKg(d);
+                },
+              ),
+              const SizedBox(height: 16),
+              Text('Weekly Pace',
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodyMedium
+                      ?.copyWith(fontWeight: FontWeight.w600)),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: _paces.map((p) {
+                  final (paceVal, label, sublabel) = p;
+                  final isSelected = state.paceKgPerWeek == paceVal;
+                  final isUnsafe = tdeeVal != null &&
+                      state.goalType == 'lose' &&
+                      TdeeCalculator.isPaceUnsafe(
+                        tdeeValue: tdeeVal,
+                        gender: state.gender ?? 'male',
+                        paceKgPerWeek: paceVal,
+                      );
+                  return Tooltip(
+                    message: isUnsafe
+                        ? 'Not available — choose a slower pace'
+                        : '',
+                    child: ChoiceChip(
+                      label: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(label),
+                          Text(sublabel,
+                              style: const TextStyle(fontSize: 10)),
+                        ],
+                      ),
+                      selected: isSelected,
+                      selectedColor: AppColors.primary,
+                      labelStyle: TextStyle(
+                        color: isUnsafe
+                            ? Theme.of(context).disabledColor
+                            : isSelected
+                                ? Colors.white
+                                : null,
+                        fontWeight: isSelected
+                            ? FontWeight.w600
+                            : FontWeight.normal,
+                      ),
+                      onSelected:
+                          isUnsafe ? null : (_) => notifier.setPaceKgPerWeek(paceVal),
+                    ),
+                  );
+                }).toList(),
+              ),
+
+              // Live preview banner
+              if (preview != null) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                        color: AppColors.primary.withValues(alpha: 0.2)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.bolt_outlined,
+                          size: 16, color: AppColors.primary),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Your daily target will be ${preview.round()} kcal/day',
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodyMedium
+                            ?.copyWith(color: AppColors.primary),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+
             const SizedBox(height: 20),
 
             // ── Water target ───────────────────────────────────────────
@@ -316,7 +471,7 @@ class _DatePickerRow extends StatelessWidget {
               const Icon(Icons.calendar_today_outlined, size: 18),
         ),
         child: Text(
-          value ?? 'Select date',
+          value != null ? _formatDob(value!) : 'Select date',
           style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                 color: value == null ? Theme.of(context).hintColor : null,
               ),

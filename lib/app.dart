@@ -5,6 +5,7 @@ import 'core/theme/app_theme.dart';
 import 'core/theme/app_colors.dart';
 import 'features/onboarding/onboarding_provider.dart';
 import 'features/onboarding/onboarding_screen.dart';
+import 'features/onboarding/welcome_screen.dart';
 import 'features/dashboard/dashboard_screen.dart';
 import 'features/history/history_screen.dart';
 import 'features/weight/weight_screen.dart';
@@ -25,9 +26,20 @@ class CalorieTrackerApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       onGenerateRoute: (settings) {
         if (settings.name == '/food-search') {
-          final mealType = (settings.arguments as String?) ?? 'breakfast';
+          // Arguments may be a plain String (meal type) for back-compat,
+          // or a Map<String, String> with 'mealType' and optional 'date'.
+          final args = settings.arguments;
+          String mealType = 'breakfast';
+          String? logDate;
+          if (args is Map<String, String>) {
+            mealType = args['mealType'] ?? 'breakfast';
+            logDate = args['date'];
+          } else if (args is String) {
+            mealType = args;
+          }
           return MaterialPageRoute(
-            builder: (_) => FoodSearchScreen(mealType: mealType),
+            builder: (_) =>
+                FoodSearchScreen(mealType: mealType, logDate: logDate),
             settings: settings,
           );
         }
@@ -45,11 +57,18 @@ class CalorieTrackerApp extends StatelessWidget {
 }
 
 /// Checks onboarding status and routes to the correct screen.
-class _AppRouter extends ConsumerWidget {
+class _AppRouter extends ConsumerStatefulWidget {
   const _AppRouter();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_AppRouter> createState() => _AppRouterState();
+}
+
+class _AppRouterState extends ConsumerState<_AppRouter> {
+  bool _welcomeSeen = false;
+
+  @override
+  Widget build(BuildContext context) {
     final asyncValue = ref.watch(onboardingCompleteProvider);
 
     return asyncValue.when(
@@ -60,8 +79,11 @@ class _AppRouter extends ConsumerWidget {
         body: Center(child: Text('Error: $e')),
       ),
       data: (isComplete) {
-        if (isComplete) {
-          return const _MainShell();
+        if (isComplete) return const _MainShell();
+        if (!_welcomeSeen) {
+          return WelcomeScreen(
+            onGetStarted: () => setState(() => _welcomeSeen = true),
+          );
         }
         return const OnboardingScreen();
       },

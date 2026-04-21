@@ -5,6 +5,536 @@ Most recent session at the top.
 
 ---
 
+## 2026-04-20 — SPEC-001 Personalised Daily Calorie Target
+
+### What was completed
+
+Implemented all 6 P0 requirements from `docs/spec-calorie-target.md`.
+`flutter analyze` — 0 issues. `flutter test` — 223/223 passing (including 9 migration
+tests and 20 new TDEE unit tests). Release APK built and installed on device.
+
+---
+
+#### REQ-01 + REQ-02 · Target Weight + Pace inputs in Onboarding ✅ DONE
+
+**`lib/features/onboarding/onboarding_screen.dart`**
+- `_Page4Goal` converted to `ConsumerStatefulWidget`
+- After goal-type selector, when lose/gain: shows Target Weight `TextFormField`
+  (validated lose<current, gain>current) and a `Wrap` of 4 `ChoiceChip`s
+  (Gradual 0.25 / Moderate 0.5 / Active 0.75 / Aggressive 1.0)
+- Aggressive chip disabled when `TdeeCalculator.isPaceUnsafe()` returns true
+- Live timeline preview: `'~N weeks at this pace'` (shown once targetWeightKg set)
+- `_finish()` validates `targetWeightKg != null` for lose/gain; shows SnackBar otherwise
+
+**`lib/features/onboarding/onboarding_provider.dart`**
+- Added `targetWeightKg` (nullable, sentinel pattern for copyWith) and
+  `paceKgPerWeek` (default 0.5) to `OnboardingFormState`
+- `saveProfile()` uses `personalizedCalorieTarget` when `targetWeightKg != null`
+  and goal is lose/gain; falls back to legacy `calorieTarget()` otherwise
+- Stores `targetWeightKg` and `paceKgPerWeek` in `UserProfileCompanion`
+
+---
+
+#### REQ-03 · Personalised calculation logic ✅ DONE
+
+**`lib/core/utils/tdee_calculator.dart`** — 3 new static methods:
+- `personalizedCalorieTarget()` — daily_deficit = paceKgPerWeek × 7700 / 7;
+  clamped to 1500 (male) / 1200 (female) min; gain capped at TDEE + 500
+- `isPaceUnsafe()` — true if pace would push target below safe minimum
+- `weeksToGoal()` — `ceil((|current − target|) / pace)`, null for maintain/zero pace
+
+Legacy `calorieTarget()` retained as fallback for existing profiles where
+`targetWeightKg` is null (no backfill — OQ-02 decision).
+
+---
+
+#### REQ-04 · Dashboard goal summary banner ✅ DONE
+
+**`lib/features/dashboard/dashboard_screen.dart`**
+- Added `_GoalSummaryBanner` widget between CalorieRing padding and MacroBar
+- Shows: `'Goal: Lose 6.0 kg · ~12 weeks at current pace'` or `'Goal: Maintain weight'`
+- Taps navigate to `ProfileScreen` via `Navigator.push`
+
+---
+
+#### REQ-05 · Recalculate target on weight log ✅ DONE
+
+**`lib/features/weight/weight_screen.dart`**
+- After `logWeight(kg)`: fetches profile, recalculates TDEE + target, upserts profile
+- Snackbar: `'Daily target updated to X kcal based on your new weight'`
+- If `kg <= targetWt` (lose) or `kg >= targetWt` (gain): shows
+  `'You've reached your goal!'` dialog with `'Switch to Maintain?'` option
+
+---
+
+#### REQ-06 · Edit goal + pace from Profile ✅ DONE
+
+**`lib/features/profile/profile_provider.dart`**
+- Added `targetWeightKg` + `paceKgPerWeek` to `ProfileEditState`
+- `fromProfile()` reads `p.paceKgPerWeek` (non-nullable, DB default 0.5)
+- `previewCalorieTarget` getter — synchronous TDEE computation from current state
+- `save()` uses `personalizedCalorieTarget` same pattern as onboarding
+
+**`lib/features/profile/profile_screen.dart`**
+- Goal Details section with Target Weight field, 4-pace-chip selector,
+  Aggressive disabled when unsafe
+- Live preview banner: `'Your daily target will be X kcal/day'`
+- Save snackbar shows new kcal value
+
+---
+
+#### Schema v4 migration ✅ DONE
+
+**`lib/data/tables/user_profile_table.dart`**
+- Added `targetWeightKg` (RealColumn, nullable) and
+  `paceKgPerWeek` (RealColumn, default 0.5)
+
+**`lib/data/database/app_database.dart`**
+- `schemaVersion` bumped to 4
+- `_upgradeToV4()`: `addColumn(userProfile, userProfile.targetWeightKg)` +
+  `addColumn(userProfile, userProfile.paceKgPerWeek)`
+
+**`drift_schemas/calorie_tracker/drift_schema_v4.json`** — schema snapshot dumped
+
+**`test/data/database/calorie_tracker/generated/schema_v3.dart`** — written manually
+in old build_runner format (copy of v2 + `foodName` on FoodLogs + `exerciseName`
+on ExerciseLogs + `DatabaseAtV3`). Needed because `drift_dev schema generate`
+produces new simplified format that breaks `testWithDataIntegrity`.
+
+**`test/data/database/calorie_tracker/generated/schema.dart`** — updated to include
+v3 and v4 entries.
+
+---
+
+#### Tests ✅
+
+- 20 new unit tests in `test/core/utils/tdee_calculator_test.dart`
+  (personalizedCalorieTarget × 7, isPaceUnsafe × 4, weeksToGoal × 6, existing × 3)
+- 9/9 migration tests pass (6 simple + 3 data integrity including v1→v3, v1→v4)
+- 223/223 total pass
+
+---
+
+## 2026-04-19 — Enhancements (docs/enhancements.md)
+
+### What was completed
+
+Implemented all 6 enhancements from `docs/enhancements.md`. No schema changes —
+all fixes are in provider, widget, and UI layers. `flutter analyze` — 0 issues.
+`flutter test` — 203/203 passing.
+
+---
+
+#### ENH-01 · Morning Snack + Evening Snack meal sections ✅ DONE
+
+Added `morning_snack` and `evening_snack` as first-class meal types across the
+full stack.
+
+**`lib/widgets/meal_section.dart`**
+- Added icon entries: `morning_snack → Icons.coffee_outlined`,
+  `evening_snack → Icons.local_cafe_outlined`, `snacks → Icons.cookie_outlined`
+- Fixed `_title` getter to split on `_` and capitalise each word:
+  `'morning_snack'` → `'Morning Snack'` (was simple `.capitalize()` which
+  broke for multi-word types)
+
+**`lib/features/dashboard/dashboard_screen.dart`**
+- Meal loop updated to: `breakfast → morning_snack → lunch → evening_snack → dinner → snacks`
+
+**`lib/features/history/history_screen.dart`**
+- Same 6-meal order applied to the history read-only view
+
+**`lib/features/food_log/food_search_screen.dart`**
+- `_MealTypeSelector._meals` expanded to include all 6 meal types with display labels
+- AppBar title uses new `_titleCase()` helper so multi-word types render correctly
+
+---
+
+#### ENH-02 · Burned calories not reflected immediately ✅ FIXED
+
+**Root cause:** `dashboard_provider.dart` `dashboard()` used `await for` on
+the food-log stream only, then called `exerciseLogsDao.getLogsForDate()` (a
+one-shot Future). When a new exercise was inserted the food stream did not
+re-emit, so the provider never re-fetched exercise data — the burned-calorie
+total stayed stale until a food log event triggered a rebuild.
+
+**Fix (`lib/features/dashboard/dashboard_provider.dart`):**
+- Replaced the single `await for (foodStream)` pattern with a `StreamController`
+  that subscribes to **both** `foodLogsDao.watchLogsForDate(date)` and
+  `exerciseLogsDao.watchLogsForDate(date)`.
+- Each sub updates its `latest*` variable and calls `push()` which adds a fresh
+  `DashboardData` to the controller.
+- Either stream emitting (insert, delete, or update on food OR exercise) now
+  immediately produces a new dashboard snapshot.
+
+---
+
+#### ENH-03 · Dashboard top-right icon — Nutrition Summary sheet ✅ DONE
+
+**Root cause:** The icon was calling `Navigator.pushNamed('/profile')` which
+is not registered in `app.dart`'s `onGenerateRoute`, so it silently failed.
+
+**Fix (`lib/features/dashboard/dashboard_screen.dart`):**
+- Changed icon to `Icons.bar_chart_outlined` with tooltip `'Nutrition Summary'`.
+- `onPressed` reads `dashboardProvider.valueOrNull` and opens a
+  `showModalBottomSheet` with `_NutritionSummarySheet`.
+- Sheet (new widget `_NutritionSummarySheet`) shows:
+  - Calorie consumed vs target with a progress bar
+  - Protein / Carbs / Fat progress bars vs targets
+  - Meal-by-meal calorie breakdown (all 6 meal types)
+  - Burned exercise calories and net calorie total
+- Uses `DraggableScrollableSheet` so the user can expand/collapse it.
+
+---
+
+#### ENH-04 · Exercise delete not working ✅ FIXED
+
+**Root cause:** Same as ENH-02. After `exerciseLogsDao.deleteLog(id)` the DB
+row was removed but the dashboard stream (watching food logs only) never
+re-emitted, so the deleted entry stayed visible.
+
+**Fix:** Covered entirely by the ENH-02 `StreamController` merge — the
+exercise-log stream now emits on every delete, causing immediate UI refresh.
+No additional code changes required.
+
+---
+
+#### ENH-05 · Allow food logging on past dates ✅ DONE
+
+**Finding:** The date-threading code was functionally correct — `logDate` was
+already passed from `DashboardDateNotifier` → route args → `FoodSearchScreen`
+→ `_FoodDetailInline` → `logFood()`. However, there was no visual confirmation
+of the target date in the food search or food detail screens, causing user
+confusion about which date was being logged to.
+
+**Fix (`lib/features/food_log/food_search_screen.dart`):**
+- Added `_isToday()` and `_formatLogDate()` helpers.
+- When `widget.logDate` is set and is not today, the AppBar title becomes a
+  `Column` with a subtitle line: `"Logging for Mon, Apr 18"` in `Colors.white70`.
+- Users can now clearly confirm the target date before logging.
+
+---
+
+#### ENH-06 · Food search pre-selects correct meal tab ✅ FIXED
+
+**Root cause:** `_FoodDetailInlineState.build` read the selected meal type
+from `mealTypeNotifierProvider` (a `@riverpod` autoDispose provider). The
+provider was set by `FoodSearchScreen.initState`, but since `FoodSearchScreen`
+itself never **watched** the provider (it used `widget.mealType` directly),
+Riverpod considered it unobserved and disposed it. By the time
+`_FoodDetailInline` subscribed, the provider had reset to its default
+`'breakfast'`.
+
+**Fix (`lib/features/food_log/food_search_screen.dart`):**
+- Removed the `ref.watch(mealTypeNotifierProvider)` call from
+  `_FoodDetailInlineState.build`.
+- Added `late String _mealType` field to `_FoodDetailInlineState`, initialised
+  from `widget.mealType` in `initState`.
+- `_MealTypeSelector.onSelected` now calls `setState(() => _mealType = v)`
+  instead of writing to the provider.
+- The "Log Food" button passes `_mealType` directly. The selected meal chip
+  now always pre-selects whatever meal the user came from.
+
+---
+
+### Files changed
+| File | Changes |
+|---|---|
+| `lib/widgets/meal_section.dart` | ENH-01: new icons, multi-word title fix |
+| `lib/features/dashboard/dashboard_provider.dart` | ENH-02/04: StreamController merging both streams |
+| `lib/features/dashboard/dashboard_screen.dart` | ENH-01/03: new meal order, nutrition summary sheet |
+| `lib/features/history/history_screen.dart` | ENH-01: new meal order |
+| `lib/features/food_log/food_search_screen.dart` | ENH-01/05/06: title case, date banner, local meal state |
+
+### Test results
+- `flutter analyze` — 0 issues
+- `flutter test` — 203/203 passed (0 failures, 0 skipped)
+- Integration tests — 27/27 passed on device (run prior to this session)
+
+---
+
+## 2026-04-18 — Daily Tracking UI Review (docs/ui-review-daily-tracking.md)
+
+### What was completed
+
+Worked through all 15 checklist items from the daily-tracking UI review.
+Changes span schema, providers, and UI across dashboard, history, weight,
+profile, food detail, exercise card, meal section, and custom food screens.
+
+---
+
+#### BUG-DT-01 · Food names shown as "Food #XX" on Dashboard ✅ FIXED
+
+**Root cause:** `FoodLogs` table stored only `foodId`; `ExerciseLogs` stored
+only `exerciseId`. Both widgets rendered the raw ID as the display name.
+
+**Fix — schema change (v2 → v3):**
+- Added `TextColumn get foodName` (default `''`) to `FoodLogs`
+- Added `TextColumn get exerciseName` (default `''`) to `ExerciseLogs`
+- Bumped `schemaVersion` to `3`; added `_upgradeToV3(Migrator m)` which calls
+  `m.addColumn` on both tables. Existing rows get the empty-string default.
+- Ran `build_runner` to regenerate all `.g.dart` files.
+
+**Fix — providers:**
+- `food_log_provider.dart` `logFood()`: added `foodName: Value(food.name)`
+- `exercise_log_provider.dart` `logExercise()`: added `exerciseName: Value(exercise.name)`
+
+**Fix — UI:**
+- `meal_section.dart` `_FoodLogTile`: renders `log.foodName` (falls back to
+  `'Food #${log.foodId}'` for pre-migration rows that have empty name)
+- `exercise_card.dart` `_ExerciseLogTile`: renders `log.exerciseName` (same
+  fallback pattern)
+
+---
+
+#### BUG-DT-02 · Floating `≡` debug button (NOT a code bug) ℹ️
+
+**Finding:** No explicit debug overlay widget found in source.
+`debugShowCheckedModeBanner` is already `false`. The button is the Flutter
+DevTools inspector — only visible in `flutter run` debug mode, absent from
+`flutter run --release` or a signed APK.  
+**Action required before Play Store submission:** Verify with `flutter run --release`.
+
+---
+
+#### BUG-DT-03 · "−0 kcal" in Exercise section ✅ FIXED
+
+`exercise_card.dart` — both the card-level trailing total and the per-row
+`_ExerciseLogTile` trailing now guard against zero:
+```dart
+burned == 0 ? '0 kcal' : '−${burned.round()} kcal'
+```
+
+---
+
+#### BUG-DT-04 · DOB ISO format on Profile screen ✅ ALREADY FIXED
+
+`profile_screen.dart` `_DatePickerRow` already calls `_formatDob(value!)`
+which renders "January 1, 1990". No change needed.
+
+---
+
+#### BUG-DT-05 · History date nav bar shows raw ISO string ✅ FIXED
+
+`history_screen.dart` `_DateNavBar` — was rendering the raw `selectedDate`
+ISO string. Added `_formatNavDate(String)` method that returns
+`'Today'` / `'Mon, Apr 17'` consistent with the Dashboard AppBar.
+
+---
+
+#### UX-DT-01 · Serving unit hardcoded to grams ✅ FIXED
+
+`food_search_screen.dart` `_FoodDetailInline`:
+- Introduced `_ServingUnit` enum (`g`, `ml`, `oz`, `cup`, `piece`) each with
+  a `toGrams` conversion factor.
+- Added a `DropdownButton<_ServingUnit>` next to the quantity `TextField`.
+- `_unitQuantity` stores what the user typed; `_quantity` = `_unitQuantity × unit.toGrams`.
+  DB always receives grams — no schema change needed.
+- Serving description hint text uses `TextOverflow.ellipsis` to handle long labels.
+
+---
+
+#### UX-DT-02 · No date navigation on Dashboard ✅ FIXED
+
+**Provider changes (`dashboard_provider.dart`):**
+- Added `DashboardDateNotifier` (Riverpod `@riverpod` class) — starts at
+  today, exposes `goBack()`, `goForward()` (capped at today), and `isToday`.
+- `dashboardProvider` and `todayWaterMlProvider` now watch
+  `dashboardDateNotifierProvider` instead of `todayProvider`.
+
+**UI changes (`dashboard_screen.dart`):**
+- AppBar title replaced with a `Row` containing `‹`, formatted date label, `›`.
+  Forward button is disabled and greyed when already on today.
+- `FloatingActionButton` and each `MealSection.onAddFood` callback now pass
+  `{'mealType': meal, 'date': date}` as the named-route argument.
+
+**Route change (`app.dart`):**
+- `/food-search` route handler now accepts either a plain `String` (back-compat)
+  or `Map<String, String>` with `'mealType'` + optional `'date'`.
+
+**Food search/detail threading (`food_search_screen.dart`):**
+- `FoodSearchScreen` gains optional `logDate` field.
+- `_FoodResultTile`, `_FoodDetailRoute`, `_FoodDetailInline` — all propagate
+  `logDate` through the widget tree.
+- `_FoodDetailInline.build` uses `widget.logDate ?? DateTime.now()` so food
+  logged from a past-date Dashboard goes to the correct date.
+
+---
+
+#### UX-DT-03 · No "Log Exercise" entry on Dashboard ✅ ALREADY IMPLEMENTED
+
+`ExerciseCard` already renders a `TextButton.icon(label: 'Add Exercise')`
+and `DashboardScreen` already passes
+`onAddExercise: () => Navigator.pushNamed('/exercise-search')`. No change needed.
+
+---
+
+#### UX-DT-04 · Auto-calculate calories from macros in Add Custom Food ✅ FIXED
+
+`custom_food_screen.dart`:
+- Added `_recalcCalories()` — computes `(P × 4) + (C × 4) + (F × 9)` and
+  writes the result to `_caloriesController` when all three macro fields are filled.
+- Listeners on `_proteinController`, `_carbsController`, `_fatController` call
+  `_recalcCalories()` on every keystroke.
+- `_caloriesAutoCalculated` bool tracks whether the current value was derived
+  automatically.
+- UI: a small green `"Auto"` chip with a tooltip appears beside the Calories
+  field when the value was auto-filled. Disappears if the user manually edits it.
+
+---
+
+#### UX-DT-06 · Weight Trend chart uses red for "lose" goal ✅ FIXED
+
+`weight_screen.dart` `_WeightChart`:
+- Removed the goal-type branch (`glutenWarningLight` for lose, water-blue for
+  maintain). Chart line is now always `AppColors.primary` (green).
+- A downward trend looks healthy for "lose", upward for "gain", stable for
+  "maintain" — green is appropriate in all three cases. Red was alarming.
+
+---
+
+#### UX-DT-07 · "Last N entries" label is dynamic and awkward ✅ FIXED
+
+`weight_screen.dart` — `'Last ${recent.length} entries'` → `'Weight Log'`.
+
+---
+
+#### UX-DT-08 · Activity Level labels truncated on Profile ✅ FIXED
+
+`profile_screen.dart` `_ChipRow` for activity level:
+- `'Light'` → `'Lightly Active'`
+- `'Moderate'` → `'Moderately Active'`
+
+Now matches the full labels used on the onboarding Activity Level screen.
+
+---
+
+### Files changed
+
+| File | Change |
+|---|---|
+| `lib/data/tables/food_logs_table.dart` | +`foodName` column |
+| `lib/data/tables/exercise_logs_table.dart` | +`exerciseName` column |
+| `lib/data/database/app_database.dart` | schemaVersion 2 → 3, `_upgradeToV3` |
+| `lib/features/food_log/food_log_provider.dart` | Store `food.name` in log |
+| `lib/features/exercise_log/exercise_log_provider.dart` | Store `exercise.name` in log |
+| `lib/widgets/meal_section.dart` | Display `log.foodName` |
+| `lib/widgets/exercise_card.dart` | Display `log.exerciseName`; fix `−0 kcal` |
+| `lib/features/history/history_screen.dart` | Format date in `_DateNavBar` |
+| `lib/features/food_log/food_search_screen.dart` | Serving unit selector; `logDate` threading |
+| `lib/features/dashboard/dashboard_provider.dart` | `DashboardDateNotifier`; providers use it |
+| `lib/features/dashboard/dashboard_screen.dart` | Date nav arrows; pass date to food search |
+| `lib/app.dart` | `/food-search` route accepts Map args with `date` |
+| `lib/features/food_log/custom_food_screen.dart` | Auto-calculate calories from macros |
+| `lib/features/weight/weight_screen.dart` | Chart always green; "Weight Log" label |
+| `lib/features/profile/profile_screen.dart` | Full activity label names |
+
+### Verification
+
+| Step | Result |
+|---|---|
+| `flutter pub run build_runner build` | 128 outputs, 0 errors |
+| `flutter analyze` | `No issues found!` |
+| `flutter test` | All tests passed |
+
+### Migration test fix (same session)
+
+After the UI review changes, `flutter test` failed on:
+
+```
+simple database migrations from 1 to 2 [E]
+  Schema does not match
+  food_logs: columns: additional: Contains the following unexpected entries: food_name
+  exercise_logs: columns: additional: Contains the following unexpected entries: exercise_name
+```
+
+**Root cause:** The `onUpgrade` gates used `if (from < N)` without an upper-bound check. When the drift_dev test framework called `onUpgrade(m, 1, 2)` for the step-by-step `from 1 to 2` test, both `from < 2` and `from < 3` were true — so both migrations ran, producing a v3 schema that the verifier compared against the v2 snapshot.
+
+**Fix — three parts:**
+
+1. `lib/data/database/app_database.dart` — added `&& to >= N` ceiling guard to both migration gates:
+   ```dart
+   if (from < 2 && to >= 2) await _upgradeToV2(m);
+   if (from < 3 && to >= 3) await _upgradeToV3(m);
+   ```
+   In production `to` is always `schemaVersion` (latest), so all applicable blocks still run. The guard only limits step-by-step test calls.
+
+2. `drift_schemas/calorie_tracker/drift_schema_v3.json` — dumped with `dart run drift_dev schema dump`.
+
+3. `test/data/database/calorie_tracker/generated/schema_v3.dart` — auto-generated by `dart run drift_dev make-migrations`.
+
+4. `test/data/database/calorie_tracker/migration_test.dart`:
+   - Added `import 'generated/schema_v3.dart' as v3`
+   - Data-integrity tests updated to `newVersion: 3` + `createNew: v3.DatabaseAtV3.new` (since migrating from v1 runs both upgrades when `to=3`)
+   - Empty-db test now calls `migrateAndValidate(db, 3)`
+   - Added `expect(logs.first.foodName, '')` assertion (pre-migration rows get the empty-string default)
+   - Auto-loop now generates and passes all three combinations: `1→2`, `1→3`, `2→3` (6 migration tests total)
+
+### Remaining / follow-up
+
+- **BUG-DT-02**: Confirm `≡` button absent in `flutter run --release` before Play Store submission.
+- **UX-DT-05** (optional): Add calorie ring colour progression green → amber → red as user nears limit.
+- **UX-DT-06** (optional): Add ℹ️ tooltip on "Net" calories label explaining Consumed − Burned.
+- Pre-migration food/exercise log rows have empty `foodName`/`exerciseName` — they fall back to `"Food #ID"` / `"Exercise #ID"`. This is acceptable; all new rows going forward store real names.
+
+---
+
+## 2026-04-18 — Onboarding UI Review (docs/ui-review-onboarding.md)
+
+### What was completed
+
+Implemented all actionable items from the onboarding UI review. Changes are
+purely UI/UX — no schema or DAO changes required.
+
+#### BUG-ON-01 · Debug hamburger button (NOT a code bug)
+**Finding:** No explicit debug overlay widget found in source. The floating `≡`
+button is Flutter's built-in DevTools inspector — it only renders in debug builds
+and is absent from `flutter run --release` or a signed APK. No code change needed.
+**Action required:** Verify with `flutter run --release` before Play Store submission.
+
+#### BUG-ON-02 · ISO date display → human-readable ✅ FIXED
+- Added `_formatDob(String iso)` helper to both files (no `intl` dep needed)
+- `onboarding_screen.dart` `_DatePickerField`: renders "January 1, 1990" not "1990-01-01"
+- `profile_screen.dart` `_DatePickerRow`: same fix
+
+#### UX-ON-01 · Empty whitespace on Pages 1 & 2 ✅ FIXED
+- Added reusable `_TipCard` widget to `onboarding_screen.dart`
+- Page 1 (Personal Info): tip explains BMR calculation
+- Page 2 (Body Metrics): tip explains Mifflin-St Jeor formula
+
+#### UX-ON-02 · Gluten-Free toggle moved from onboarding to Profile ✅ FIXED
+- Removed toggle + divider from `_Page4Goal` in `onboarding_screen.dart`
+- `isGlutenFree` still defaults to `true` in `OnboardingFormState` — profile saves correctly
+- Toggle already existed in `profile_screen.dart` Dietary section — no change needed there
+- Removed now-unused `gluten_badge.dart` import from `onboarding_screen.dart`
+
+#### UX-ON-03 · Welcome / Splash screen added ✅ FIXED
+- Created `lib/features/onboarding/welcome_screen.dart` (`WelcomeScreen`)
+- Shows: fire icon placeholder, "CalorieTracker" headline, tagline, "Get Started" CTA
+- `app.dart` `_AppRouter`: non-complete users now see `WelcomeScreen` → tapping
+  "Get Started" does `Navigator.pushReplacement` to `OnboardingScreen`
+- Logo placeholder: `Icons.local_fire_department` (replace with real asset later)
+
+#### UX-ON-04 · Extra Active 5th activity level ✅ FIXED
+- `tdee_calculator.dart`: added `'extra_active': 1.9` multiplier
+- `onboarding_screen.dart` `_Page3Activity`: 5th card "Hard exercise every day or physical job"
+- `profile_screen.dart` Activity Level chip row: 5th chip "Extra Active"
+
+### Files changed
+| File | Change |
+|---|---|
+| `lib/features/onboarding/onboarding_screen.dart` | Date format, tip cards, gluten toggle removed, extra_active card |
+| `lib/features/profile/profile_screen.dart` | Date format, extra_active chip |
+| `lib/core/utils/tdee_calculator.dart` | extra_active multiplier 1.9 |
+| `lib/features/onboarding/welcome_screen.dart` | NEW — welcome/splash screen |
+| `lib/app.dart` | Routes to WelcomeScreen instead of OnboardingScreen on first launch |
+
+### Remaining / follow-up
+- Replace `Icons.local_fire_department` in `WelcomeScreen` with real app logo asset
+- Test on device: verify debug hamburger is absent in release build (BUG-ON-01)
+- Design/branding notes from review (font choice, color anchors) — optional post-launch
+
+---
+
 ## 2026-04-17 — Migration Strategy Session 5 (first real seed data update)
 
 ### What was completed

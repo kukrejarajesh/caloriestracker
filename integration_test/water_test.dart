@@ -22,12 +22,17 @@ void main() {
     });
 
     Future<void> scrollToWater(WidgetTester tester) async {
+      // Extra pump to let the dashboard settle after pumpApp.
+      await tester.pump(const Duration(milliseconds: 500));
+      // Use a large delta (500px per step) so the 6-meal-section dashboard
+      // reaches WaterTracker in far fewer steps than the old 200px delta,
+      // keeping well within the per-test timeout (ENH-01 added 2 sections).
       await tester.scrollUntilVisible(
         find.byType(WaterTracker),
-        200.0,
+        500.0,
         scrollable: find.byType(Scrollable).first,
       );
-      await tester.pump(const Duration(milliseconds: 200));
+      await tester.pump(const Duration(milliseconds: 300));
     }
 
     testWidgets(
@@ -42,7 +47,7 @@ void main() {
 
         expect(find.textContaining('200ml'), findsWidgets);
       },
-      timeout: const Timeout(Duration(seconds: 30)),
+      timeout: const Timeout(Duration(seconds: 60)),
     );
 
     testWidgets(
@@ -60,7 +65,7 @@ void main() {
 
         expect(find.textContaining('600ml'), findsWidgets);
       },
-      timeout: const Timeout(Duration(seconds: 30)),
+      timeout: const Timeout(Duration(seconds: 60)),
     );
 
     testWidgets(
@@ -79,7 +84,7 @@ void main() {
 
         expect(find.textContaining('Daily goal reached'), findsWidgets);
       },
-      timeout: const Timeout(Duration(seconds: 30)),
+      timeout: const Timeout(Duration(seconds: 60)),
     );
   });
 }

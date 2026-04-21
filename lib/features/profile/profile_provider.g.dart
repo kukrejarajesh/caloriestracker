@@ -25,7 +25,7 @@ final userProfileProvider =
 // ignore: unused_element
 typedef UserProfileRef = AutoDisposeStreamProviderRef<UserProfileData?>;
 String _$profileEditNotifierHash() =>
-    r'bafcd6b489d0afbcb49aee348626f101f5783cda';
+    r'750b79e5124c853dae6fcb6826a6ddd0963a47c5';
 
 /// See also [ProfileEditNotifier].
 @ProviderFor(ProfileEditNotifier)

@@ -19,14 +19,19 @@ class MealSection extends StatelessWidget {
   });
 
   static const _mealIcons = {
-    'breakfast': Icons.wb_sunny_outlined,
-    'lunch': Icons.lunch_dining_outlined,
-    'dinner': Icons.dinner_dining_outlined,
-    'snacks': Icons.local_cafe_outlined,
+    'breakfast':     Icons.wb_sunny_outlined,
+    'morning_snack': Icons.coffee_outlined,
+    'lunch':         Icons.lunch_dining_outlined,
+    'evening_snack': Icons.local_cafe_outlined,
+    'dinner':        Icons.dinner_dining_outlined,
+    'snacks':        Icons.cookie_outlined,
   };
 
-  String get _title =>
-      mealType[0].toUpperCase() + mealType.substring(1);
+  /// Converts 'morning_snack' → 'Morning Snack', 'breakfast' → 'Breakfast'.
+  String get _title => mealType
+      .split('_')
+      .map((w) => w[0].toUpperCase() + w.substring(1))
+      .join(' ');
 
   double get _totalCalories =>
       logs.fold(0, (sum, l) => sum + l.calories);
@@ -123,7 +128,7 @@ class _FoodLogTile extends StatelessWidget {
         children: [
           Expanded(
             child: Text(
-              'Food #${log.foodId}',
+              log.foodName.isNotEmpty ? log.foodName : 'Food #${log.foodId}',
               style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                     color: riskColor,
                   ),

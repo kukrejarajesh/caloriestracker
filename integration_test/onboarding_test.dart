@@ -25,6 +25,11 @@ void main() {
       (tester) async {
         await pumpApp(tester, db);
 
+        // WelcomeScreen is shown first — dismiss it
+        await tester.tap(find.widgetWithText(ElevatedButton, 'Get Started'));
+        await tester.pump(const Duration(milliseconds: 500));
+        await tester.pump(const Duration(milliseconds: 500));
+
         expect(find.text('Personal Info'), findsOneWidget);
         expect(find.text('Step 1 of 4'), findsOneWidget);
         expect(find.byType(BottomNavigationBar), findsNothing);
@@ -36,6 +41,11 @@ void main() {
       'Next button blocked when name field is empty',
       (tester) async {
         await pumpApp(tester, db);
+
+        // WelcomeScreen is shown first — dismiss it
+        await tester.tap(find.widgetWithText(ElevatedButton, 'Get Started'));
+        await tester.pump(const Duration(milliseconds: 500));
+        await tester.pump(const Duration(milliseconds: 500));
 
         // Do not fill name — tap Next directly
         await tester.tap(find.widgetWithText(ElevatedButton, 'Next'));
@@ -49,9 +59,14 @@ void main() {
     );
 
     testWidgets(
-      'Gluten-free toggle is ON by default on page 4',
+      'Gluten-free defaults to ON in Profile after onboarding',
       (tester) async {
         await pumpApp(tester, db);
+
+        // WelcomeScreen is shown first — dismiss it
+        await tester.tap(find.widgetWithText(ElevatedButton, 'Get Started'));
+        await tester.pump(const Duration(milliseconds: 500));
+        await tester.pump(const Duration(milliseconds: 500));
 
         // Page 1 — fill name
         await tester.enterText(
@@ -112,7 +127,21 @@ void main() {
         await tester.pump(const Duration(milliseconds: 500));
         await tester.pump(const Duration(milliseconds: 500));
 
-        // Page 4 — verify gluten toggle is ON
+        // Page 4 — gluten toggle moved to Profile; verify page 4 has no Switch
+        expect(find.text('Your Goal'), findsOneWidget);
+        expect(find.byType(Switch), findsNothing);
+
+        // Complete onboarding
+        await tester.tap(find.text('Maintain Weight'));
+        await tester.pump(const Duration(milliseconds: 200));
+        await tester.tap(find.widgetWithText(ElevatedButton, 'Get Started'));
+        await tester.pump(const Duration(milliseconds: 1000));
+        await tester.pump(const Duration(milliseconds: 1000));
+
+        // Navigate to Profile and verify gluten switch is ON by default
+        await tapBottomNav(tester, 'Profile');
+        await tester.pump(const Duration(milliseconds: 500));
+
         final switchWidget = tester.widget<Switch>(find.byType(Switch));
         expect(switchWidget.value, isTrue);
       },
@@ -123,6 +152,11 @@ void main() {
       'Full happy path completes onboarding and shows Dashboard',
       (tester) async {
         await pumpApp(tester, db);
+
+        // WelcomeScreen is shown first — dismiss it
+        await tester.tap(find.widgetWithText(ElevatedButton, 'Get Started'));
+        await tester.pump(const Duration(milliseconds: 500));
+        await tester.pump(const Duration(milliseconds: 500));
 
         // Page 1
         await tester.enterText(

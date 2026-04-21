@@ -73,7 +73,7 @@ final mealTypeNotifierProvider =
     );
 
 typedef _$MealTypeNotifier = AutoDisposeNotifier<String>;
-String _$foodLogNotifierHash() => r'c1f50251c34a27118369feb5a397e48a754aecf8';
+String _$foodLogNotifierHash() => r'94a28c0874ec13480dd66461d0fd14cd9342605d';
 
 /// See also [FoodLogNotifier].
 @ProviderFor(FoodLogNotifier)

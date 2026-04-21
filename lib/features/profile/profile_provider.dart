@@ -21,6 +21,8 @@ class ProfileEditState {
   final double? weightKg;
   final String? activityLevel;
   final String? goalType;
+  final double? targetWeightKg;
+  final double paceKgPerWeek;
   final int waterTargetMl;
   final bool isGlutenFree;
   final bool isSaving;
@@ -35,12 +37,16 @@ class ProfileEditState {
     this.weightKg,
     this.activityLevel,
     this.goalType,
+    this.targetWeightKg,
+    this.paceKgPerWeek = 0.5,
     this.waterTargetMl = 2000,
     this.isGlutenFree = true,
     this.isSaving = false,
     this.error,
     this.success = false,
   });
+
+  static const _sentinel = Object();
 
   ProfileEditState copyWith({
     String? name,
@@ -50,6 +56,8 @@ class ProfileEditState {
     double? weightKg,
     String? activityLevel,
     String? goalType,
+    Object? targetWeightKg = _sentinel,
+    double? paceKgPerWeek,
     int? waterTargetMl,
     bool? isGlutenFree,
     bool? isSaving,
@@ -64,6 +72,10 @@ class ProfileEditState {
         weightKg: weightKg ?? this.weightKg,
         activityLevel: activityLevel ?? this.activityLevel,
         goalType: goalType ?? this.goalType,
+        targetWeightKg: targetWeightKg == _sentinel
+            ? this.targetWeightKg
+            : targetWeightKg as double?,
+        paceKgPerWeek: paceKgPerWeek ?? this.paceKgPerWeek,
         waterTargetMl: waterTargetMl ?? this.waterTargetMl,
         isGlutenFree: isGlutenFree ?? this.isGlutenFree,
         isSaving: isSaving ?? this.isSaving,
@@ -79,6 +91,8 @@ class ProfileEditState {
         weightKg: p.weightKg,
         activityLevel: p.activityLevel,
         goalType: p.goalType,
+        targetWeightKg: p.targetWeightKg,
+        paceKgPerWeek: p.paceKgPerWeek,
         waterTargetMl: p.waterTargetMl,
         isGlutenFree: p.isGlutenFree == 1,
       );
@@ -99,8 +113,42 @@ class ProfileEditNotifier extends _$ProfileEditNotifier {
   void setWeightKg(double v) => state = state.copyWith(weightKg: v);
   void setActivityLevel(String v) => state = state.copyWith(activityLevel: v);
   void setGoalType(String v) => state = state.copyWith(goalType: v);
+  void setTargetWeightKg(double? v) =>
+      state = state.copyWith(targetWeightKg: v);
+  void setPaceKgPerWeek(double v) => state = state.copyWith(paceKgPerWeek: v);
   void setWaterTarget(int v) => state = state.copyWith(waterTargetMl: v);
   void setIsGlutenFree(bool v) => state = state.copyWith(isGlutenFree: v);
+
+  /// Live preview of the calculated calorie target given current state.
+  /// Returns null if required fields are missing.
+  double? get previewCalorieTarget {
+    final s = state;
+    if (s.weightKg == null ||
+        s.heightCm == null ||
+        s.dateOfBirth == null ||
+        s.gender == null ||
+        s.activityLevel == null ||
+        s.goalType == null) {
+      return null;
+    }
+    final age = TdeeCalculator.ageFromDob(s.dateOfBirth!);
+    final b = TdeeCalculator.bmr(
+      weightKg: s.weightKg!,
+      heightCm: s.heightCm!,
+      ageYears: age,
+      gender: s.gender!,
+    );
+    final t = TdeeCalculator.tdee(bmr: b, activityLevel: s.activityLevel!);
+    if (s.goalType == 'maintain') return t;
+    return (s.targetWeightKg != null)
+        ? TdeeCalculator.personalizedCalorieTarget(
+            tdeeValue: t,
+            goalType: s.goalType!,
+            paceKgPerWeek: s.paceKgPerWeek,
+            gender: s.gender!,
+          )
+        : TdeeCalculator.calorieTarget(t, s.goalType!);
+  }
 
   Future<bool> save() async {
     final s = state;
@@ -127,10 +175,18 @@ class ProfileEditNotifier extends _$ProfileEditNotifier {
       );
       final tdeeVal =
           TdeeCalculator.tdee(bmr: bmr, activityLevel: s.activityLevel!);
+
       final calorieTarget =
-          TdeeCalculator.calorieTarget(tdeeVal, s.goalType!);
-      final macros =
-          TdeeCalculator.macroTargets(calorieTarget, s.goalType!);
+          (s.targetWeightKg != null && s.goalType != 'maintain')
+              ? TdeeCalculator.personalizedCalorieTarget(
+                  tdeeValue: tdeeVal,
+                  goalType: s.goalType!,
+                  paceKgPerWeek: s.paceKgPerWeek,
+                  gender: s.gender!,
+                )
+              : TdeeCalculator.calorieTarget(tdeeVal, s.goalType!);
+
+      final macros = TdeeCalculator.macroTargets(calorieTarget, s.goalType!);
 
       await db.userProfileDao.upsertProfile(
         UserProfileCompanion(
@@ -146,6 +202,8 @@ class ProfileEditNotifier extends _$ProfileEditNotifier {
           proteinTargetG: Value(macros.proteinG),
           carbsTargetG: Value(macros.carbsG),
           fatTargetG: Value(macros.fatG),
+          targetWeightKg: Value(s.targetWeightKg),
+          paceKgPerWeek: Value(s.paceKgPerWeek),
           waterTargetMl: Value(s.waterTargetMl),
           isGlutenFree: Value(s.isGlutenFree ? 1 : 0),
           onboardingComplete: const Value(1),
