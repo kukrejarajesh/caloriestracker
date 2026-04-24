@@ -78,8 +78,15 @@ class AppDatabase extends _$AppDatabase {
   ///        reconciliation of new seeded foods across releases without
   ///        overwriting user data or custom entries. Reconciliation itself
   ///        runs on every launch via `beforeOpen` → [DbSeeder.reconcileInto].
+  ///   v3 — adds `food_logs.food_name` + `exercise_logs.exercise_name`.
+  ///   v4 — adds `user_profile.target_weight_kg` + `user_profile.pace_kg_per_week`.
+  ///   v5 — expands `food_logs.meal_type` CHECK constraint to include
+  ///        'morning_snack' and 'evening_snack'. SQLite cannot ALTER a CHECK
+  ///        constraint, so the table is recreated via [_upgradeToV5].
+  ///   v6 — expands `user_profile.activity_level` CHECK constraint to include
+  ///        'extra_active'. Recreated via [_upgradeToV6].
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -116,6 +123,12 @@ class AppDatabase extends _$AppDatabase {
           }
           if (from < 4 && to >= 4) {
             await _upgradeToV4(m);
+          }
+          if (from < 5 && to >= 5) {
+            await _upgradeToV5(m);
+          }
+          if (from < 6 && to >= 6) {
+            await _upgradeToV6(m);
           }
         },
         beforeOpen: (OpeningDetails details) async {
@@ -198,6 +211,96 @@ class AppDatabase extends _$AppDatabase {
     await m.addColumn(userProfile, userProfile.targetWeightKg);
     await m.addColumn(userProfile, userProfile.paceKgPerWeek);
     debugPrint('AppDatabase: v4 migration complete');
+  }
+
+  /// v4 → v5 migration.
+  ///
+  /// Expands the `food_logs.meal_type` CHECK constraint to include
+  /// 'morning_snack' and 'evening_snack'. SQLite does not support
+  /// `ALTER TABLE ... MODIFY COLUMN`, so the classic rename-and-copy trick is
+  /// used instead:
+  ///   1. Create `food_logs_new` with the updated constraint.
+  ///   2. Copy all existing rows (superset constraint — no row ever fails).
+  ///   3. Drop `food_logs`, rename `food_logs_new` → `food_logs`.
+  ///
+  /// FK enforcement is suspended for the duration because `food_logs` carries
+  /// a `REFERENCES foods(id)` clause that would otherwise prevent the DROP.
+  Future<void> _upgradeToV5(Migrator m) async {
+    debugPrint(
+        'AppDatabase: migrating v4 → v5 (expand meal_type constraint)');
+    await customStatement('PRAGMA foreign_keys = OFF');
+    await customStatement('''
+      CREATE TABLE food_logs_new (
+        id            INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+        date          TEXT    NOT NULL,
+        meal_type     TEXT    NOT NULL
+                              CHECK(meal_type IN (
+                                'breakfast','morning_snack','lunch',
+                                'evening_snack','dinner','snacks'
+                              )),
+        food_id       INTEGER NOT NULL REFERENCES foods (id),
+        food_name     TEXT    NOT NULL DEFAULT '',
+        quantity_g    REAL    NOT NULL,
+        calories      REAL    NOT NULL,
+        protein       REAL    NOT NULL DEFAULT 0.0,
+        carbs         REAL    NOT NULL DEFAULT 0.0,
+        fat           REAL    NOT NULL DEFAULT 0.0,
+        gluten_status TEXT    NOT NULL DEFAULT 'unknown',
+        logged_at     TEXT    NOT NULL
+      )
+    ''');
+    await customStatement(
+        'INSERT INTO food_logs_new SELECT * FROM food_logs');
+    await customStatement('DROP TABLE food_logs');
+    await customStatement(
+        'ALTER TABLE food_logs_new RENAME TO food_logs');
+    await customStatement('PRAGMA foreign_keys = ON');
+    debugPrint('AppDatabase: v5 migration complete');
+  }
+
+  /// v5 → v6 migration.
+  ///
+  /// Expands the `user_profile.activity_level` CHECK constraint to include
+  /// 'extra_active'. SQLite does not support `ALTER TABLE … MODIFY COLUMN`,
+  /// so the rename-and-copy trick is used:
+  ///   1. Create `user_profile_new` with the updated constraint.
+  ///   2. Copy all existing rows (superset constraint — no row ever fails).
+  ///   3. Drop `user_profile`, rename `user_profile_new` → `user_profile`.
+  ///
+  /// No `PRAGMA foreign_keys` manipulation is needed because nothing in the
+  /// schema references `user_profile`.
+  Future<void> _upgradeToV6(Migrator m) async {
+    debugPrint(
+        'AppDatabase: migrating v5 → v6 (expand activity_level constraint)');
+    await customStatement('''
+      CREATE TABLE user_profile_new (
+        id                  INTEGER NOT NULL DEFAULT 1,
+        name                TEXT NULL,
+        date_of_birth       TEXT NULL,
+        gender              TEXT CHECK(gender IN ('male','female','other')),
+        height_cm           REAL NULL,
+        weight_kg           REAL NULL,
+        activity_level      TEXT CHECK(activity_level IN ('sedentary','lightly_active','moderately_active','very_active','extra_active')),
+        goal_type           TEXT CHECK(goal_type IN ('lose','maintain','gain')),
+        calorie_target      REAL NULL,
+        protein_target_g    REAL NULL,
+        carbs_target_g      REAL NULL,
+        fat_target_g        REAL NULL,
+        target_weight_kg    REAL NULL,
+        pace_kg_per_week    REAL NOT NULL DEFAULT 0.5,
+        water_target_ml     INTEGER NOT NULL DEFAULT 2000,
+        is_gluten_free      INTEGER NOT NULL DEFAULT 1,
+        db_version          INTEGER NOT NULL DEFAULT 1,
+        onboarding_complete INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (id)
+      )
+    ''');
+    await customStatement(
+        'INSERT INTO user_profile_new SELECT * FROM user_profile');
+    await customStatement('DROP TABLE user_profile');
+    await customStatement(
+        'ALTER TABLE user_profile_new RENAME TO user_profile');
+    debugPrint('AppDatabase: v6 migration complete');
   }
 
   static QueryExecutor _openConnection() {

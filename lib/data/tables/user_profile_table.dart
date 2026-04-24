@@ -13,7 +13,7 @@ class UserProfile extends Table {
   TextColumn get activityLevel => text()
       .nullable()
       .customConstraint(
-          "CHECK(activity_level IN ('sedentary','lightly_active','moderately_active','very_active'))")();
+          "CHECK(activity_level IN ('sedentary','lightly_active','moderately_active','very_active','extra_active'))")();
   TextColumn get goalType => text()
       .nullable()
       .customConstraint(

@@ -8,7 +8,8 @@ import 'exercise_log_provider.dart';
 import 'exercise_log_screen.dart';
 
 class ExerciseSearchScreen extends ConsumerStatefulWidget {
-  const ExerciseSearchScreen({super.key});
+  final String? logDate;
+  const ExerciseSearchScreen({super.key, this.logDate});
 
   @override
   ConsumerState<ExerciseSearchScreen> createState() =>
@@ -112,8 +113,10 @@ class _ExerciseSearchScreenState
                   itemCount: exercises.length,
                   separatorBuilder: (_, _) =>
                       const Divider(height: 1, indent: 72),
-                  itemBuilder: (context, i) =>
-                      _ExerciseTile(exercise: exercises[i]),
+                  itemBuilder: (context, i) => _ExerciseTile(
+                    exercise: exercises[i],
+                    logDate: widget.logDate,
+                  ),
                 );
               },
             ),
@@ -126,7 +129,8 @@ class _ExerciseSearchScreenState
 
 class _ExerciseTile extends StatelessWidget {
   final Exercise exercise;
-  const _ExerciseTile({required this.exercise});
+  final String? logDate;
+  const _ExerciseTile({required this.exercise, this.logDate});
 
   @override
   Widget build(BuildContext context) {
@@ -144,7 +148,8 @@ class _ExerciseTile extends StatelessWidget {
       trailing: const Icon(Icons.chevron_right),
       onTap: () => Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (_) => ExerciseLogScreen(exercise: exercise),
+          builder: (_) =>
+              ExerciseLogScreen(exercise: exercise, logDate: logDate),
         ),
       ),
     );

@@ -8,7 +8,8 @@ import 'exercise_log_provider.dart';
 
 class ExerciseLogScreen extends ConsumerStatefulWidget {
   final Exercise exercise;
-  const ExerciseLogScreen({super.key, required this.exercise});
+  final String? logDate;
+  const ExerciseLogScreen({super.key, required this.exercise, this.logDate});
 
   @override
   ConsumerState<ExerciseLogScreen> createState() =>
@@ -47,9 +48,10 @@ class _ExerciseLogScreenState extends ConsumerState<ExerciseLogScreen> {
       );
 
   Future<void> _log() async {
-    final now = DateTime.now();
-    final date =
-        '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    final date = widget.logDate ?? () {
+      final now = DateTime.now();
+      return '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    }();
 
     final ok = await ref
         .read(exerciseLogNotifierProvider.notifier)

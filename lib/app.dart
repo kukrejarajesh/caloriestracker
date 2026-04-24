@@ -7,7 +7,7 @@ import 'features/onboarding/onboarding_provider.dart';
 import 'features/onboarding/onboarding_screen.dart';
 import 'features/onboarding/welcome_screen.dart';
 import 'features/dashboard/dashboard_screen.dart';
-import 'features/history/history_screen.dart';
+import 'features/statistics/statistics_screen.dart';
 import 'features/weight/weight_screen.dart';
 import 'features/profile/profile_screen.dart';
 import 'features/food_log/food_search_screen.dart';
@@ -44,8 +44,13 @@ class CalorieTrackerApp extends StatelessWidget {
           );
         }
         if (settings.name == '/exercise-search') {
+          final args = settings.arguments;
+          String? logDate;
+          if (args is Map<String, String>) {
+            logDate = args['date'];
+          }
           return MaterialPageRoute(
-            builder: (_) => const ExerciseSearchScreen(),
+            builder: (_) => ExerciseSearchScreen(logDate: logDate),
             settings: settings,
           );
         }
@@ -91,7 +96,7 @@ class _AppRouterState extends ConsumerState<_AppRouter> {
   }
 }
 
-/// Main shell with bottom navigation: Dashboard · History · Weight · Profile
+/// Main shell with bottom navigation: Dashboard · Statistics · Weight · Profile
 class _MainShell extends StatefulWidget {
   const _MainShell();
 
@@ -104,7 +109,7 @@ class _MainShellState extends State<_MainShell> {
 
   static const _screens = [
     DashboardScreen(),
-    HistoryScreen(),
+    StatisticsScreen(),
     WeightScreen(),
     ProfileScreen(),
   ];
@@ -129,9 +134,9 @@ class _MainShellState extends State<_MainShell> {
             label: 'Dashboard',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.history_outlined),
-            activeIcon: Icon(Icons.history),
-            label: 'History',
+            icon: Icon(Icons.bar_chart_outlined),
+            activeIcon: Icon(Icons.bar_chart),
+            label: 'Statistics',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.monitor_weight_outlined),

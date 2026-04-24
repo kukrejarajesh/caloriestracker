@@ -1028,7 +1028,7 @@ class $FoodLogsTable extends FoodLogs with TableInfo<$FoodLogsTable, FoodLog> {
     type: DriftSqlType.string,
     requiredDuringInsert: true,
     $customConstraints:
-        'NOT NULL CHECK(meal_type IN (\'breakfast\',\'lunch\',\'dinner\',\'snacks\'))',
+        'NOT NULL CHECK(meal_type IN (\'breakfast\',\'morning_snack\',\'lunch\',\'evening_snack\',\'dinner\',\'snacks\'))',
   );
   static const VerificationMeta _foodIdMeta = const VerificationMeta('foodId');
   @override
@@ -3172,7 +3172,7 @@ class $UserProfileTable extends UserProfile
     type: DriftSqlType.string,
     requiredDuringInsert: false,
     $customConstraints:
-        'CHECK(activity_level IN (\'sedentary\',\'lightly_active\',\'moderately_active\',\'very_active\'))',
+        'CHECK(activity_level IN (\'sedentary\',\'lightly_active\',\'moderately_active\',\'very_active\',\'extra_active\'))',
   );
   static const VerificationMeta _goalTypeMeta = const VerificationMeta(
     'goalType',

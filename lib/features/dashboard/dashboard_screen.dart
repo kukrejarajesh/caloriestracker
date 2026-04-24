@@ -214,8 +214,10 @@ class _DashboardBody extends ConsumerWidget {
         // ── Exercise card ──────────────────────────────────────────────────
         ExerciseCard(
           logs: data.exerciseLogs,
-          onAddExercise: () =>
-              Navigator.of(context).pushNamed('/exercise-search'),
+          onAddExercise: () => Navigator.of(context).pushNamed(
+            '/exercise-search',
+            arguments: {'date': date},
+          ),
           onDeleteLog: (log) => _deleteExerciseLog(ref, log),
         ),
 

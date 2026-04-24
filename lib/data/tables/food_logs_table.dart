@@ -5,7 +5,7 @@ class FoodLogs extends Table {
   IntColumn get id => integer().autoIncrement()();
   TextColumn get date => text()();
   TextColumn get mealType => text().customConstraint(
-      "NOT NULL CHECK(meal_type IN ('breakfast','lunch','dinner','snacks'))")();
+      "NOT NULL CHECK(meal_type IN ('breakfast','morning_snack','lunch','evening_snack','dinner','snacks'))")();
   IntColumn get foodId => integer().references(Foods, #id)();
   TextColumn get foodName => text().withDefault(const Constant(''))();
   RealColumn get quantityG => real()();

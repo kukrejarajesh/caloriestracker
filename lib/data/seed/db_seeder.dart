@@ -44,7 +44,7 @@ class DbSeeder {
   ///
   /// DO NOT bump without regenerating assets/foods.db. DO NOT regenerate
   /// assets/foods.db without bumping. (See ADR §2.)
-  static const int currentSeedVersion = 2;
+  static const int currentSeedVersion = 3;
 
   /// Called from [AppDatabase.migration] onCreate — reads the bundled asset DBs
   /// and inserts all rows into the already-created Drift tables.
